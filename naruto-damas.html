@@ -1,0 +1,2198 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Damas Ninja: Konoha vs Akatsuki</title>
+<style>
+  :root{
+    --konoha: #2d7dd2;
+    --konoha-dark: #1a4f85;
+    --akatsuki: #b3312c;
+    --akatsuki-dark: #6e1512;
+    --board-light: #e8d9b5;
+    --board-dark: #3a3226;
+    --bg: #16181d;
+    --panel: #1f232b;
+    --gold: #e0b83a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background: radial-gradient(circle at 50% 0%, #262c38, var(--bg) 70%);
+    color:#eee;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+  }
+  h1{
+    margin:0 0 4px;
+    font-size:1.6rem;
+    text-align:center;
+    letter-spacing:1px;
+    background: linear-gradient(90deg, var(--konoha), var(--gold), var(--akatsuki));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+  .subtitle{
+    color:#9aa1ad;
+    font-size:0.85rem;
+    margin-bottom:14px;
+    text-align:center;
+  }
+  .layout{
+    display:flex;
+    gap:20px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .board-grid{
+    display:grid;
+    grid-template-columns: repeat(8, 56px);
+    grid-template-rows: repeat(8, 56px);
+    border:6px solid #4a3b23;
+    border-radius:8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+  .sq{
+    width:56px; height:56px;
+    display:flex;align-items:center;justify-content:center;
+    position:relative;
+  }
+  .light{background:var(--board-light);}
+  .dark{background:var(--board-dark);}
+  .sq.selectable::after{
+    content:"";
+    position:absolute;
+    width:16px;height:16px;
+    border-radius:50%;
+    background: rgba(224,184,58,0.85);
+    box-shadow:0 0 8px 2px rgba(224,184,58,0.7);
+  }
+  .sq.capture-target::after{
+    background: rgba(220,50,50,0.85);
+    box-shadow:0 0 10px 3px rgba(220,50,50,0.8);
+  }
+  .sq.special-approach{
+    outline: 3px solid #9b59ff;
+    outline-offset:-3px;
+    box-shadow: inset 0 0 14px 3px rgba(155,89,255,0.85);
+    cursor:pointer;
+  }
+  .sq.special-boulder{
+    outline: 3px solid #a0602a;
+    outline-offset:-3px;
+    box-shadow: inset 0 0 14px 3px rgba(160,96,42,0.85);
+    cursor:pointer;
+  }
+  .sq.special-summon::after{
+    background: rgba(46,204,140,0.9);
+    box-shadow:0 0 12px 4px rgba(46,204,140,0.85);
+  }
+  .sq.special-clone::after{
+    background: rgba(238,203,59,0.9);
+    box-shadow:0 0 12px 4px rgba(238,203,59,0.85);
+  }
+  .sq.special-kamui{
+    outline: 3px solid #6a2fb0;
+    outline-offset:-3px;
+    box-shadow: inset 0 0 14px 3px rgba(106,47,176,0.85);
+    cursor:pointer;
+  }
+  .sq.trapped{
+    background-image: repeating-linear-gradient(45deg, rgba(255,140,0,0.35) 0 6px, rgba(255,140,0,0.12) 6px 12px);
+    box-shadow: inset 0 0 12px rgba(255,140,0,0.85);
+  }
+  .sq.trapped::before{
+    content:"⚠️";
+    position:absolute;
+    font-size:16px;
+    opacity:0.9;
+    pointer-events:none;
+  }
+  .sq.selected{
+    outline: 3px solid var(--gold);
+    outline-offset:-3px;
+  }
+  .piece{
+    width:48px;height:48px;
+    border-radius:50%;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    font-size:9px;
+    font-weight:700;
+    line-height:1;
+    cursor:pointer;
+    user-select:none;
+    position:relative;
+    color:#fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    transition: transform 0.12s ease;
+  }
+  .piece:hover{ transform: scale(1.08); }
+  .piece.konoha{
+    background: radial-gradient(circle at 35% 30%, #4d9ded, var(--konoha) 60%, var(--konoha-dark));
+    border: 2px solid #a9d2f5;
+  }
+  .piece.akatsuki{
+    background: radial-gradient(circle at 35% 30%, #d95e50, var(--akatsuki) 60%, var(--akatsuki-dark));
+    border: 2px solid #2a1414;
+  }
+  .piece .face{ width:32px; height:32px; display:block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
+  .piece .face svg{ width:100%; height:100%; display:block; }
+  .piece .name{ font-size:7.5px; margin-top:0; text-align:center; padding:0 2px; }
+  .piece.king{
+    box-shadow: 0 0 0 3px var(--gold), 0 0 10px 2px rgba(224,184,58,0.8);
+  }
+  .piece.king::before{
+    content:"👑";
+    position:absolute;
+    top:-13px;
+    font-size:13px;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.7));
+  }
+  .piece.clone-piece{
+    opacity:0.72;
+    outline:2px dashed rgba(255,255,255,0.6);
+    outline-offset:2px;
+  }
+  .piece .ability-badge{
+    position:absolute;
+    bottom:-6px;
+    right:-6px;
+    width:16px;height:16px;
+    border-radius:50%;
+    background:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;
+    box-shadow:0 0 5px rgba(0,0,0,0.6);
+  }
+  #panel{
+    width:260px;
+    background: var(--panel);
+    border-radius:10px;
+    padding:16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  #status{
+    font-size:1.05rem;
+    font-weight:600;
+    margin-bottom:10px;
+    padding:10px;
+    border-radius:8px;
+    text-align:center;
+    background: #2a2f3a;
+  }
+  #status.turn-konoha{ border-left:5px solid var(--konoha); }
+  #status.turn-akatsuki{ border-left:5px solid var(--akatsuki); }
+  .score-row{
+    display:flex;justify-content:space-between;
+    font-size:0.9rem;
+    margin:4px 0;
+    padding:6px 8px;
+    border-radius:6px;
+    background:#262b34;
+  }
+  .score-row .konoha-label{color:#7db4ee;font-weight:700;}
+  .score-row .akatsuki-label{color:#e58a83;font-weight:700;}
+  button#restart{
+    margin-top:14px;
+    width:100%;
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    background: linear-gradient(90deg, var(--konoha), var(--akatsuki));
+    color:#fff;
+    font-weight:700;
+    cursor:pointer;
+    font-size:0.95rem;
+  }
+  button#restart:hover{ filter:brightness(1.1); }
+  button#ability-btn{
+    display:none;
+    width:100%;
+    padding:9px;
+    margin-bottom:10px;
+    border:none;
+    border-radius:8px;
+    background: linear-gradient(90deg, #9b59ff, #2ecc8c);
+    color:#fff;
+    font-weight:700;
+    cursor:pointer;
+    font-size:0.85rem;
+  }
+  button#ability-btn:hover{ filter:brightness(1.1); }
+  button#ability-btn.active{
+    background:#3a3f4a;
+    color:#e0b83a;
+  }
+  button#music-btn, button#music-swap{
+    width:100%;
+    padding:8px;
+    margin-bottom:6px;
+    border:none;
+    border-radius:8px;
+    background:#2a2f3a;
+    color:#cbd1db;
+    font-weight:600;
+    cursor:pointer;
+    font-size:0.8rem;
+  }
+  button#music-btn:hover, button#music-swap:hover{ background:#333a46; }
+  button#music-btn.playing{ background:#1e4d3a; color:#7de8b0; }
+  button#music-btn.missing{ opacity:0.7; cursor:help; }
+  button#music-swap{ margin-bottom:10px; font-size:0.72rem; padding:6px; opacity:0.8; }
+  #match-timer{
+    text-align:center;
+    font-size:0.95rem;
+    font-weight:700;
+    color:#cbd1db;
+    margin-bottom:8px;
+    letter-spacing:1px;
+  }
+  #match-timer.low{ color:#ff5a5a; animation: timer-blink 1s infinite; }
+  @keyframes timer-blink{ 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+  .legend{
+    margin-top:16px;
+    font-size:0.78rem;
+    color:#aab0bb;
+    line-height:1.5;
+  }
+  .legend b{color:#ddd;}
+  #winner-banner{
+    display:none;
+    margin-top:10px;
+    padding:10px;
+    border-radius:8px;
+    text-align:center;
+    font-weight:700;
+    background: var(--gold);
+    color:#2a2200;
+  }
+  #match-highlights{
+    display:none;
+    margin-top:12px;
+    flex-direction:column;
+    gap:8px;
+  }
+  #match-highlights.active{ display:flex; }
+  #match-highlights .highlights-title{
+    text-align:center;
+    font-weight:700;
+    font-size:0.9rem;
+    color:#e0b83a;
+    margin-bottom:2px;
+  }
+  .trophy-card{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:#262b34;
+    border-radius:10px;
+    padding:8px 10px;
+    border-left:4px solid var(--gold);
+  }
+  .trophy-card .trophy-face{
+    width:38px;height:38px;
+    border-radius:50%;
+    flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .trophy-card .trophy-face.konoha{ background: radial-gradient(circle at 35% 30%, #4d9ded, var(--konoha) 60%, var(--konoha-dark)); border:2px solid #a9d2f5; }
+  .trophy-card .trophy-face.akatsuki{ background: radial-gradient(circle at 35% 30%, #d95e50, var(--akatsuki) 60%, var(--akatsuki-dark)); border:2px solid #2a1414; }
+  .trophy-card .trophy-face svg{ width:30px; height:30px; }
+  .trophy-card .trophy-info{ flex:1; min-width:0; }
+  .trophy-card .trophy-label{ font-size:0.68rem; color:#9aa1ad; }
+  .trophy-card .trophy-name{ font-size:0.82rem; font-weight:700; color:#eee; overflow-wrap:break-word; }
+  .trophy-card .trophy-stat{ font-size:0.72rem; color:#e0b83a; font-weight:600; }
+  #menu-overlay{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+    margin-top:20px;
+  }
+  .mode-cards{
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .mode-card{
+    width:220px;
+    background: var(--panel);
+    border:2px solid #333a46;
+    border-radius:14px;
+    padding:22px 18px;
+    text-align:center;
+    cursor:pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .mode-card:hover{
+    transform: translateY(-4px);
+    border-color: var(--gold);
+  }
+  .mode-card .icon{ font-size:2.4rem; margin-bottom:8px; }
+  .mode-card .title{ font-size:1.05rem; font-weight:700; margin-bottom:6px; }
+  .mode-card .desc{ font-size:0.8rem; color:#9aa1ad; line-height:1.4; }
+  .layout{
+    display:none;
+    gap:20px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .layout.active{ display:flex; }
+  #menu-overlay.hidden{ display:none; }
+  #village-overlay{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    margin-top:20px;
+  }
+  #village-overlay.hidden{ display:none; }
+  .village-title{ font-size:1.2rem; font-weight:700; color:#eee; }
+  .village-subtitle{ font-size:0.8rem; color:#9aa1ad; margin-bottom:6px; }
+  .mode-card.disabled{
+    opacity:0.4;
+    cursor:not-allowed;
+    position:relative;
+  }
+  .mode-card.disabled:hover{ transform:none; border-color:#333a46; }
+  .mode-card .soon-badge{
+    position:absolute;
+    top:8px; right:8px;
+    font-size:0.65rem;
+    background:#333a46;
+    color:#cbd1db;
+    padding:2px 6px;
+    border-radius:6px;
+  }
+  button#village-back{
+    margin-top:10px;
+    padding:8px 18px;
+    border:none;
+    border-radius:8px;
+    background:#2a2f3a;
+    color:#cbd1db;
+    font-weight:600;
+    cursor:pointer;
+    font-size:0.85rem;
+  }
+  button#village-back:hover{ background:#333a46; }
+  #placement-overlay{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    margin-top:20px;
+  }
+  #placement-overlay.hidden{ display:none; }
+  .placement-layout{
+    display:flex;
+    gap:20px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    justify-content:center;
+    margin-top:8px;
+  }
+  #placement-panel{ width:260px; }
+  #placement-tray{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    background:#1f232b;
+    border-radius:10px;
+    padding:10px;
+    min-height:64px;
+    margin-bottom:10px;
+  }
+  .tray-card{
+    width:44px;
+    text-align:center;
+    cursor:pointer;
+    border-radius:8px;
+    padding:3px 2px;
+    background:#262b34;
+    border:2px solid transparent;
+    font-size:6.5px;
+    color:#cbd1db;
+  }
+  .tray-card:hover{ background:#2f3644; }
+  .tray-card.selected{ border-color:#e0b83a; background:#3a3320; }
+  .tray-card .face{ width:32px; height:32px; margin:0 auto; }
+  .tray-card .face svg{ width:100%; height:100%; display:block; }
+  .sq.placement-disabled{ opacity:0.35; }
+  .sq.placement-slot{ cursor:pointer; }
+  .sq.placement-slot.placement-empty::after{
+    content:"";
+    position:absolute;
+    width:14px;height:14px;
+    border-radius:50%;
+    border:2px dashed #e0b83a;
+  }
+  .sq.placement-slot.placement-empty:hover::after{
+    background: rgba(224,184,58,0.3);
+  }
+  button#placement-random, button#placement-default, button#placement-confirm, button#placement-cancel{
+    width:100%;
+    padding:9px;
+    margin-bottom:8px;
+    border:none;
+    border-radius:8px;
+    font-weight:700;
+    cursor:pointer;
+    font-size:0.82rem;
+  }
+  button#placement-random, button#placement-default{ background:#2a2f3a; color:#cbd1db; }
+  button#placement-random:hover, button#placement-default:hover{ background:#333a46; }
+  button#placement-confirm{ background: linear-gradient(90deg, var(--konoha), var(--akatsuki)); color:#fff; }
+  button#placement-confirm:disabled{ opacity:0.4; cursor:not-allowed; }
+  button#placement-cancel{ background:transparent; color:#9aa1ad; }
+  button#placement-cancel:hover{ color:#cbd1db; }
+  .sq.ability-fx{
+    animation: ability-pulse 0.6s ease-in-out infinite;
+    z-index: 5;
+  }
+  .sq.ability-fx .piece{
+    animation: ability-piece-pulse 0.6s ease-in-out infinite;
+  }
+  @keyframes ability-pulse{
+    0%,100%{ box-shadow: inset 0 0 10px 3px rgba(255,220,120,0.5); background-color: rgba(255,220,120,0.08); }
+    50%{ box-shadow: inset 0 0 30px 12px rgba(255,220,120,1); background-color: rgba(255,220,120,0.28); }
+  }
+  @keyframes ability-piece-pulse{
+    0%,100%{ transform: scale(1); filter: brightness(1) drop-shadow(0 0 2px rgba(255,220,120,0.6)); }
+    50%{ transform: scale(1.18); filter: brightness(1.35) drop-shadow(0 0 10px rgba(255,220,120,1)); }
+  }
+  button#back-to-menu{
+    margin-top:8px;
+    width:100%;
+    padding:8px;
+    border:none;
+    border-radius:8px;
+    background:#2a2f3a;
+    color:#cbd1db;
+    font-weight:600;
+    cursor:pointer;
+    font-size:0.85rem;
+  }
+  button#back-to-menu:hover{ background:#333a46; }
+  #ai-thinking{
+    display:none;
+    font-size:0.8rem;
+    color:var(--gold);
+    text-align:center;
+    margin:-4px 0 10px;
+  }
+  #ai-thinking.active{ display:block; }
+</style>
+</head>
+<body>
+  <h1>Damas Ninja</h1>
+  <div class="subtitle">Konoha 🍃 vs Akatsuki ☁️ — regras clássicas de damas, captura obrigatória</div>
+
+  <div id="menu-overlay">
+    <div class="mode-cards">
+      <div class="mode-card" id="mode-friend">
+        <div class="icon">🧑‍🤝‍🧑</div>
+        <div class="title">Jogar com Amigo</div>
+        <div class="desc">Dois jogadores revezam no mesmo dispositivo. Konoha começa jogando.</div>
+      </div>
+      <div class="mode-card" id="mode-ai">
+        <div class="icon">🤖</div>
+        <div class="title">Jogar com Robô (IA)</div>
+        <div class="desc">Escolha sua vila; a IA controla a vila adversária e joga automaticamente.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="village-overlay" class="hidden">
+    <div class="village-title">Escolha sua vila</div>
+    <div class="village-subtitle">A IA controla a vila adversária automaticamente.</div>
+    <div class="mode-cards" id="village-cards"></div>
+    <button id="village-back">← Voltar</button>
+  </div>
+
+  <div id="placement-overlay" class="hidden">
+    <div class="village-title" id="placement-title">Posicione o time</div>
+    <div class="village-subtitle">Clique num personagem abaixo e depois numa casa destacada para posicioná-lo. Clique numa peça já posicionada para devolvê-la.</div>
+    <div class="placement-layout">
+      <div id="placement-board" class="board-grid"></div>
+      <div id="placement-panel">
+        <div id="placement-tray"></div>
+        <button id="placement-random">🎲 Posições Aleatórias</button>
+        <button id="placement-default">↺ Ordem Padrão</button>
+        <button id="placement-confirm" disabled>✅ Confirmar e Continuar</button>
+        <button id="placement-cancel">← Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div id="board" class="board-grid"></div>
+
+    <div id="panel">
+      <div id="status" class="turn-konoha">Vez de: Konoha</div>
+      <div id="ai-thinking">🤖 IA pensando...</div>
+      <div id="match-timer">⏱ 6:00</div>
+      <div class="score-row"><span class="konoha-label">Konoha</span><span id="score-konoha">12</span></div>
+      <div class="score-row"><span class="akatsuki-label">Akatsuki</span><span id="score-akatsuki">12</span></div>
+      <div id="winner-banner"></div>
+      <div id="match-highlights"></div>
+      <button id="ability-btn"></button>
+      <button id="music-btn">📁 Escolher Música de Fundo</button>
+      <button id="music-swap" style="display:none;">🔁 Trocar música</button>
+      <input type="file" id="music-file-input" accept="audio/*" style="display:none">
+      <audio id="bgm" loop></audio>
+      <button id="restart">Reiniciar Partida</button>
+      <button id="back-to-menu">← Voltar ao Menu</button>
+      <div class="legend">
+        <b>Como jogar:</b> clique numa peça e depois num círculo dourado para mover. Capturas (círculo vermelho) são obrigatórias quando disponíveis, incluindo capturas em cadeia. Ao chegar na última fileira, o personagem vira <b>Dama (👑 Modo Sábio)</b>, ganha nome/visual especiais e pode se mover/capturar em qualquer diagonal por até 4 casas.
+        <br><br>
+        <b>Habilidades ativadas (1x por partida — 2x se a peça virar Dama —, bloqueadas se houver captura obrigatória):</b><br>
+        🍥 <b>Naruto — Kage Bunshin no Jutsu:</b> clique no badge ✨ e depois numa casa amarela vazia ao lado do Naruto para criar até 2 Clones de Sombra 👥 nas casas diagonais vazias. Cada clone age como peça normal, mas dura só 6 turnos (ou até ser capturado) e, se for capturado, <b>não conta ponto de eliminação</b> para quem o pegou.<br>
+        ☔ <b>Pain — Bansho Ten'in (Empurrão Celestial):</b> se aparecer o badge ✨, clique nele e depois numa peça inimiga com contorno roxo (exatamente 2 casas de distância na diagonal, em qualquer direção) para <b>puxá-la 1 casa para perto do Pain</b>, sem capturar. O Pain não se move.<br>
+        🐺 <b>Kiba — Jūjin Bunshin (Akamaru):</b> clique no badge ✨ e depois numa casa verde vazia ao lado do Kiba para criar o Akamaru 🐕, um novo aliado (não pode virar Dama; se chegar na última fileira, desaparece).<br>
+        🍖 <b>Chōji — Nikudan Sensha (Bola Humana):</b> clique no badge ✨ e depois numa casa com contorno marrom para virar uma bola gigante e rolar <b>exatamente 3 casas</b> em qualquer diagonal, atravessando quem estiver no caminho. Peças (aliadas ou inimigas) na 1ª e 3ª casa do trajeto são empurradas 1 casa adiante; a peça na 2ª casa é sempre esmagada. Se o empurrão não tiver pra onde ir, a peça é eliminada — mas só 1 eliminação por uso; se precisar de uma 2ª, o Chōji perde o movimento naquela direção.<br>
+        🌀 <b>Obito — Kamui:</b> clique no badge ✨ e depois numa peça inimiga adjacente (contorno roxo-escuro) para bani-la para a dimensão Kamui. Ela some do tabuleiro por 2 turnos do dono e reaparece no 3º turno na casa onde começou a partida (ou na mais próxima livre).
+        <br><br>
+        <b>Habilidades passivas (automáticas):</b><br>
+        🎯 <b>Tenten — Sōshōryū (Chuva de Armas):</b> na primeira vez que capturar uma peça na partida, a casa da vítima fica <span style="color:#ff9f43">⚠️ armadilhada</span> por 2 turnos do Akatsuki — nenhuma peça do Akatsuki pode se mover ou pousar ali (nem capturando) enquanto durar.<br>
+        💥 <b>Deidara — C0 (Katsu!):</b> se for capturado, a peça que o capturou explode junto e também é removida do tabuleiro, mesmo no meio de uma captura em cadeia (o turno termina ali).<br>
+        🌑 <b>Itachi — Kawarimi: Bunshin de Corvos:</b> na primeira vez que for capturado, uma ilusão de corvos toma seu lugar (é ela quem é removida); o Itachi reaparece na casa livre mais próxima de onde estava, escapando da captura.
+        <br><br>
+        <b>👑 Virar Dama:</b> além de mover em qualquer direção (até 4 casas), o personagem troca de nome e visual para sua forma especial (ex: Naruto vira "Raposa de Sete Caudas") e, se tiver uma habilidade especial, ganha <b>mais 1 uso</b> dela.
+        <br><br>
+        <b>🎵 Música:</b> não posso incluir a trilha do anime por direitos autorais. Clique em "Escolher Música de Fundo" e selecione qualquer arquivo de áudio do seu computador — toca em loop até você pausar.
+        <br><br>
+        <b>⏱ Tempo:</b> a partida tem limite de 6 minutos. Se o tempo acabar, o jogo termina em empate e o Pódio da Batalha é exibido normalmente.
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const ROWS = 8, COLS = 8;
+  const KING_RANGE = 4; // Dama's flying range, halved from the full board (was up to 7 squares)
+  const KONOHA = 'konoha', AKATSUKI = 'akatsuki';
+
+  // Builds a "power-up" variant of a base face: colored aura behind the head, glowing eyes, optional extra marks.
+  function kingify(base, opts){
+    opts = opts || {};
+    const f = Object.assign({}, base, opts.override || {});
+    f.kingGlow = opts.glow || '#ffcc55';
+    if(opts.eye) f.eye = opts.eye;
+    if(opts.eyeStyle) f.eyeStyle = opts.eyeStyle;
+    const marks = (base.marks || []).slice();
+    if(opts.extraMark) marks.push(opts.extraMark);
+    f.marks = marks;
+    return f;
+  }
+
+  const konohaRoster = [
+    {name:'Naruto', face:{hair:'#eecb3b',hairStyle:'spiky',eye:'#3d8fd6',eyeStyle:'dot',band:'konoha',marks:['whiskers'],mouth:'smile'}, ability:'kage_bunshin',
+      kingForm:{name:'Raposa de Sete Caudas', face:kingify({hair:'#e8862c',hairStyle:'spiky',mouth:'fangSmile',marks:['whiskers']}, {glow:'#ff8c1a', eye:'#ff5a00', eyeStyle:'slit', extraMark:'foxEars', override:{skin:'#f4c8a0'}})}},
+    {name:'Sakura', face:{hair:'#f2a0c4',hairStyle:'long',eye:'#4fae5c',eyeStyle:'dot',band:'konoha',mouth:'smile'},
+      kingForm:{name:'Byakugou: Selo Ativado', face:kingify({hair:'#f2a0c4',hairStyle:'long',mouth:'smile'}, {glow:'#ff5fa8', eye:'#ffd23d', extraMark:'seal'})}},
+    {name:'Kakashi', face:{hair:'#c7c9cc',hairStyle:'spiky',eye:'#333',eyeStyle:'dot',tiltedBand:true,mask:'#4a5568'},
+      kingForm:{name:'Kakashi: Susanoo Parcial', face:kingify({hair:'#c7c9cc',hairStyle:'spiky',tiltedBand:true,mask:'#4a5568'}, {glow:'#8a6fd6', eye:'#c21c1c', eyeStyle:'sharingan'})}},
+    {name:'Sasuke', face:{hair:'#232323',hairStyle:'spiky',eye:'#222',eyeStyle:'sharingan',band:'konoha',mouth:'flat'},
+      kingForm:{name:'Sasuke: Susanoo Completo', face:kingify({hair:'#232323',hairStyle:'spiky',mouth:'flat'}, {glow:'#7a4fd6', eye:'#c21c1c', eyeStyle:'sharingan'})}},
+    {name:'Hinata', face:{hair:'#2b2340',hairStyle:'long',eye:'#333',eyeStyle:'byakugan',band:'none',mouth:'smile'},
+      kingForm:{name:'Hinata: Hakke Absoluto', face:kingify({hair:'#2b2340',hairStyle:'long',mouth:'smile'}, {glow:'#c9a8dd', eyeStyle:'byakugan'})}},
+    {name:'Shikamaru', face:{hair:'#3a3226',hairStyle:'pony',eye:'#333',eyeStyle:'closed',band:'konoha',mouth:'flat'},
+      kingForm:{name:'Shikamaru: Domínio das Sombras', face:kingify({hair:'#3a3226',hairStyle:'pony',mouth:'flat'}, {glow:'#5a5a6e', eye:'#111', eyeStyle:'dot'})}},
+    {name:'Rock Lee', face:{hair:'#151515',hairStyle:'slick',capR:36,eye:'#222',eyeStyle:'dot',band:'konoha',mouth:'fangSmile'},
+      kingForm:{name:'Lee: Oitava Porta', face:kingify({hair:'#151515',hairStyle:'slick',capR:36,mouth:'fangSmile',override:{skin:'#e89898'}}, {glow:'#ff3b3b', eye:'#fff', eyeStyle:'dot'})}},
+    {name:'Neji', face:{hair:'#2c2418',hairStyle:'long',eye:'#333',eyeStyle:'byakugan',band:'konoha',mouth:'flat'},
+      kingForm:{name:'Neji: Kaiten Absoluto', face:kingify({hair:'#2c2418',hairStyle:'long',mouth:'flat'}, {glow:'#c9a8dd', eyeStyle:'byakugan'})}},
+    {name:'Choji', face:{hair:'#8a4a2a',hairStyle:'spiky',eye:'#5a3a1a',eyeStyle:'dot',band:'konoha',marks:['swirl'],mouth:'smile'}, ability:'boulder',
+      kingForm:{name:'Chōji: Modo Borboleta', face:kingify({hair:'#8a4a2a',hairStyle:'spiky',marks:['swirl'],mouth:'smile'}, {glow:'#ff7a2a', eye:'#c9503a', eyeStyle:'dot'})}},
+    {name:'Ino', face:{hair:'#f0d24a',hairStyle:'pony',eye:'#3d8fd6',eyeStyle:'dot',band:'none',mouth:'smile'},
+      kingForm:{name:'Ino: Domínio Mental', face:kingify({hair:'#f0d24a',hairStyle:'pony',mouth:'smile'}, {glow:'#a86fe0', eye:'#a86fe0'})}},
+    {name:'Kiba', face:{hair:'#5a3a20',hairStyle:'spiky',eye:'#333',eyeStyle:'dot',band:'konoha',marks:['fangs'],mouth:'fangSmile'}, ability:'summon',
+      kingForm:{name:'Garouga (Kiba + Akamaru)', face:kingify({hair:'#5a3a20',hairStyle:'spiky',marks:['fangs'],mouth:'fangSmile'}, {glow:'#e0a04a', eye:'#c9503a', eyeStyle:'slit', extraMark:'wolfEars'})}},
+    {name:'Tenten', face:{hair:'#3a2418',hairStyle:'buns',eye:'#3a2418',eyeStyle:'dot',band:'konoha',mouth:'smile'},
+      kingForm:{name:'Tenten: Mestra das Armas', face:kingify({hair:'#3a2418',hairStyle:'buns',mouth:'smile'}, {glow:'#c9ccd1', eye:'#3a2418'})}}
+  ];
+  const akatsukiRoster = [
+    {name:'Itachi', face:{hair:'#0f0f12',hairStyle:'pony',eye:'#222',eyeStyle:'sharingan',band:'none',marks:['tomoe'],mouth:'flat'},
+      kingForm:{name:'Itachi: Susanoo', face:kingify({hair:'#0f0f12',hairStyle:'pony',marks:['tomoe'],mouth:'flat'}, {glow:'#7a4fd6', eye:'#c21c1c', eyeStyle:'sharingan'})}},
+    {name:'Pain', face:{hair:'#e8862c',hairStyle:'bigspiky',eye:'#c9a0e0',eyeStyle:'rinnegan',band:'none',marks:['piercings'],mouth:'flat'}, ability:'approach',
+      kingForm:{name:'Pain: Caminho Divino', face:kingify({hair:'#e8862c',hairStyle:'bigspiky',marks:['piercings'],mouth:'flat'}, {glow:'#c9a0e0', eyeStyle:'rinnegan'})}},
+    {name:'Konan', face:{hair:'#4d5fd6',hairStyle:'long',eye:'#c98a2a',eyeStyle:'dot',band:'none',mouth:'flat'},
+      kingForm:{name:'Konan: Anjo de Papel', face:kingify({hair:'#4d5fd6',hairStyle:'long',mouth:'flat'}, {glow:'#e8e8f0', eye:'#c98a2a', extraMark:'wings'})}},
+    {name:'Kisame', face:{skin:'#8fd3e8',hair:'#0a3d4a',hairStyle:'none',eye:'#222',eyeStyle:'dot',band:'none',marks:['gills'],mouth:'fangSmile'},
+      kingForm:{name:'Kisame: Samehada Desperta', face:kingify({skin:'#5fb3cc',hair:'#0a3d4a',hairStyle:'none',marks:['gills'],mouth:'fangSmile'}, {glow:'#2f9ec9', eye:'#fff', eyeStyle:'sharingan'})}},
+    {name:'Deidara', face:{hair:'#eecb3b',hairStyle:'pony',eye:'#3d8fd6',eyeStyle:'dot',band:'none',mouth:'smile'},
+      kingForm:{name:'Deidara: C1 Supremo', face:kingify({hair:'#eecb3b',hairStyle:'pony',mouth:'smile'}, {glow:'#ff9a3d', eye:'#3d8fd6'})}},
+    {name:'Sasori', face:{hair:'#b5342a',hairStyle:'slick',eye:'#8a2020',eyeStyle:'closed',band:'none',mouth:'none'},
+      kingForm:{name:'Sasori: Núcleo do 3º Kazekage', face:kingify({hair:'#b5342a',hairStyle:'slick',mouth:'none'}, {glow:'#c9503a', eye:'#8a2020', eyeStyle:'dot'})}},
+    {name:'Hidan', face:{hair:'#d8d8d8',hairStyle:'slick',eye:'#7a3fb0',eyeStyle:'dot',band:'none',mouth:'flat'},
+      kingForm:{name:'Hidan: Ritual de Jashin', face:kingify({hair:'#d8d8d8',hairStyle:'slick',mouth:'flat'}, {glow:'#c21c1c', eye:'#7a3fb0'})}},
+    {name:'Kakuzu', face:{hair:'#1a3d2a',hairStyle:'slick',eye:'#2a5a3a',eyeStyle:'dot',band:'none',marks:['stitches'],mask:'#3a3a3a'},
+      kingForm:{name:'Kakuzu: 5 Corações', face:kingify({hair:'#1a3d2a',hairStyle:'slick',marks:['stitches'],mask:'#3a3a3a'}, {glow:'#2a5a3a', eye:'#4aa060'})}},
+    {name:'Obito', face:{hair:'#1a1a1a',hairStyle:'spiky',eye:'#c21c1c',eyeStyle:'sharingan',band:'none',mask:'#e07a2a'}, ability:'kamui',
+      kingForm:{name:'Obito: Jinchūriki do Jūbi', face:kingify({hair:'#1a1a1a',hairStyle:'spiky',mask:'#e07a2a'}, {glow:'#9a3dd6', eye:'#c21c1c', eyeStyle:'rinnegan'})}},
+    {name:'Orochimaru', face:{hair:'#111',hairStyle:'long',eye:'#e8d84a',eyeStyle:'slit',band:'none',mouth:'flat'},
+      kingForm:{name:'Orochimaru: Sennin de Ofídios', face:kingify({hair:'#111',hairStyle:'long',mouth:'flat'}, {glow:'#6aa03d', eyeStyle:'slit'})}},
+    {name:'Kabuto', face:{hair:'#c7c9cc',hairStyle:'slick',eye:'#333',eyeStyle:'dot',band:'none',glasses:true,mouth:'flat'},
+      kingForm:{name:'Kabuto: Fusão com Orochimaru', face:kingify({hair:'#c7c9cc',hairStyle:'slick',glasses:true,mouth:'flat'}, {glow:'#6aa03d', eye:'#e8d84a', eyeStyle:'slit'})}},
+    {name:'Zetsu', face:{hair:'#1a3d1a',hairStyle:'none',eye:'#e8d84a',eyeStyle:'dot',band:'none',special:'zetsu',mouth:'flat'},
+      kingForm:{name:'Zetsu: Fusão com o Jūbi', face:kingify({hair:'#1a3d1a',hairStyle:'none',special:'zetsu',mouth:'flat'}, {glow:'#9a3dd6', eye:'#c21c1c', eyeStyle:'sharingan'})}}
+  ];
+
+  const SKIN = '#f4c8a0';
+
+  function earsSVG(skin){
+    return `<circle cx="17" cy="55" r="6.5" fill="${skin}"/><circle cx="83" cy="55" r="6.5" fill="${skin}"/>`;
+  }
+
+  function hairSVG(cfg){
+    const hair = cfg.hair;
+    let s = '';
+    if(cfg.hairStyle==='none'){
+      s += `<circle cx="50" cy="${cfg.faceCy||60}" r="${cfg.faceR||30}" fill="${cfg.skin||SKIN}"/>`;
+      return s;
+    }
+    const capR = cfg.capR || 34, capCy = cfg.capCy || 49;
+    s += `<circle cx="50" cy="${capCy}" r="${capR}" fill="${hair}"/>`;
+    if(cfg.hairStyle==='spiky'){
+      [[20,26],[32,10],[44,20],[50,6],[56,20],[68,10],[80,26]].forEach(([x,y])=>{
+        s += `<path d="M${x-7},${capCy} L${x},${y} L${x+7},${capCy} Z" fill="${hair}"/>`;
+      });
+    }
+    if(cfg.hairStyle==='bigspiky'){
+      [[14,30],[22,8],[34,-4],[50,-8],[66,-4],[78,8],[86,30]].forEach(([x,y])=>{
+        s += `<path d="M${x-9},${capCy-2} L${x},${y} L${x+9},${capCy-2} Z" fill="${hair}"/>`;
+      });
+    }
+    if(cfg.hairStyle==='long'){
+      s += `<ellipse cx="15" cy="70" rx="9" ry="26" fill="${hair}"/>`;
+      s += `<ellipse cx="85" cy="70" rx="9" ry="26" fill="${hair}"/>`;
+    }
+    if(cfg.hairStyle==='buns'){
+      s += `<circle cx="22" cy="24" r="10" fill="${hair}"/>`;
+      s += `<circle cx="78" cy="24" r="10" fill="${hair}"/>`;
+    }
+    if(cfg.hairStyle==='pony'){
+      s += `<ellipse cx="84" cy="60" rx="10" ry="24" fill="${hair}" transform="rotate(15 84 60)"/>`;
+    }
+    if(cfg.hairStyle==='slick'){
+      s += `<path d="M50,${capCy-capR} L58,${capCy-6} L42,${capCy-6} Z" fill="${hair}"/>`;
+    }
+    const faceR = cfg.faceR || 30, faceCy = cfg.faceCy || 60;
+    s += `<circle cx="50" cy="${faceCy}" r="${faceR}" fill="${cfg.skin||SKIN}"/>`;
+    return s;
+  }
+
+  function eyesSVG(cfg){
+    const lx=37, rx=63, y=62;
+    const c = cfg.eye || '#333';
+    let s = '';
+    if(cfg.kingGlow){
+      [lx,rx].forEach(x=>{ s += `<circle cx="${x}" cy="${y}" r="9" fill="${cfg.kingGlow}" opacity="0.55"/>`; });
+    }
+    const style = cfg.eyeStyle || 'dot';
+    if(style==='dot'){
+      [lx,rx].forEach(x=>{
+        s += `<circle cx="${x}" cy="${y}" r="5.2" fill="${c}"/><circle cx="${x-1.6}" cy="${y-1.6}" r="1.6" fill="#fff"/>`;
+      });
+    } else if(style==='byakugan'){
+      [lx,rx].forEach(x=>{
+        s += `<ellipse cx="${x}" cy="${y}" rx="6" ry="4.5" fill="#f0e6f6" stroke="#c9a8dd" stroke-width="1.2"/>`;
+      });
+    } else if(style==='rinnegan'){
+      [lx,rx].forEach(x=>{
+        s += `<circle cx="${x}" cy="${y}" r="5.5" fill="#c9a0e0"/><circle cx="${x}" cy="${y}" r="3.4" fill="none" stroke="#6b3fa0" stroke-width="1"/><circle cx="${x}" cy="${y}" r="1.3" fill="#3d1a5c"/>`;
+      });
+    } else if(style==='slit'){
+      [lx,rx].forEach(x=>{
+        s += `<ellipse cx="${x}" cy="${y}" rx="5.2" ry="5" fill="${cfg.eye||'#e8d84a'}"/><rect x="${x-0.8}" y="${y-4}" width="1.6" height="8" fill="#111"/>`;
+      });
+    } else if(style==='closed'){
+      [lx,rx].forEach(x=>{
+        s += `<path d="M${x-5},${y} Q${x},${y+4} ${x+5},${y}" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`;
+      });
+    } else if(style==='sharingan'){
+      [lx,rx].forEach(x=>{
+        s += `<circle cx="${x}" cy="${y}" r="5.4" fill="#c21c1c"/><circle cx="${x}" cy="${y}" r="1.6" fill="#1a0505"/>`;
+      });
+    }
+    return s;
+  }
+
+  function bandSVG(kind){
+    if(kind==='none') return '';
+    const color = kind==='akatsuki' ? '#3a3a3a' : '#3d6fb5';
+    return `<rect x="14" y="44" width="72" height="10" rx="2" fill="${color}" stroke="#20242c" stroke-width="1"/><rect x="44" y="45" width="12" height="8" rx="1" fill="#c9ccd1"/>`;
+  }
+
+  function tiltedBandSVG(){
+    return `<g transform="rotate(-18 50 55)"><rect x="10" y="44" width="80" height="11" rx="2" fill="#3d6fb5" stroke="#20242c" stroke-width="1"/><rect x="42" y="45.5" width="13" height="8" rx="1" fill="#c9ccd1"/></g>`;
+  }
+
+  function marksSVG(kind){
+    let s = '';
+    if(kind==='whiskers'){
+      [[24,66],[76,66]].forEach(([x,y])=>{
+        const dir = x<50?-1:1;
+        for(let i=-1;i<=1;i++){
+          s += `<line x1="${x}" y1="${y+i*4}" x2="${x+dir*10}" y2="${y+i*4+2}" stroke="#c98a4b" stroke-width="1.4" stroke-linecap="round"/>`;
+        }
+      });
+    }
+    if(kind==='fangs'){
+      s += `<path d="M20,68 L28,62 L26,72 Z" fill="#b5271f"/><path d="M80,68 L72,62 L74,72 Z" fill="#b5271f"/>`;
+    }
+    if(kind==='swirl'){
+      [30,70].forEach(x=>{
+        s += `<circle cx="${x}" cy="68" r="4" fill="none" stroke="#c9503a" stroke-width="1.3"/><circle cx="${x}" cy="68" r="1.6" fill="#c9503a"/>`;
+      });
+    }
+    if(kind==='tomoe'){
+      [[38,68],[62,68]].forEach(([x,y])=>{
+        s += `<line x1="${x-4}" y1="${y}" x2="${x+2}" y2="${y+5}" stroke="#7a5a4a" stroke-width="1.5" stroke-linecap="round"/>`;
+      });
+    }
+    if(kind==='gills'){
+      [22,78].forEach(x=>{
+        const dir = x<50?1:-1;
+        for(let i=0;i<3;i++){
+          s += `<line x1="${x}" y1="${58+i*5}" x2="${x+dir*6}" y2="${60+i*5}" stroke="#2f6e82" stroke-width="1.4" stroke-linecap="round"/>`;
+        }
+      });
+    }
+    if(kind==='piercings'){
+      [[38,74],[62,74],[50,78]].forEach(([x,y])=>{
+        s += `<circle cx="${x}" cy="${y}" r="1.3" fill="#888"/>`;
+      });
+    }
+    if(kind==='stitches'){
+      s += `<path d="M32,74 L38,70 M38,74 L32,70 M62,74 L68,70 M68,74 L62,70" stroke="#222" stroke-width="1.4" stroke-linecap="round"/>`;
+    }
+    if(kind==='foxEars'){
+      s += `<path d="M22,26 L13,2 L34,19 Z" fill="#e8862c"/><path d="M78,26 L87,2 L66,19 Z" fill="#e8862c"/>`;
+      s += `<path d="M23,21 L18,8 L29,17 Z" fill="#3a1f10"/><path d="M77,21 L82,8 L71,17 Z" fill="#3a1f10"/>`;
+    }
+    if(kind==='wolfEars'){
+      s += `<path d="M24,24 L17,1 L38,16 Z" fill="#5a3a20"/><path d="M76,24 L83,1 L62,16 Z" fill="#5a3a20"/>`;
+      s += `<path d="M25,20 L21,8 L31,15 Z" fill="#2a1a10"/><path d="M75,20 L79,8 L69,15 Z" fill="#2a1a10"/>`;
+    }
+    if(kind==='wings'){
+      s += `<path d="M14,52 Q-2,30 8,6 Q22,24 24,52 Z" fill="#f2f2f2" opacity="0.92"/><path d="M86,52 Q102,30 92,6 Q78,24 76,52 Z" fill="#f2f2f2" opacity="0.92"/>`;
+    }
+    if(kind==='seal'){
+      s += `<path d="M50,20 L54,26 L50,32 L46,26 Z" fill="#e0507a"/>`;
+    }
+    return s;
+  }
+
+  function glassesSVG(){
+    return `<circle cx="37" cy="58" r="7" fill="none" stroke="#d8d8d8" stroke-width="1.6"/><circle cx="63" cy="58" r="7" fill="none" stroke="#d8d8d8" stroke-width="1.6"/><line x1="44" y1="58" x2="56" y2="58" stroke="#d8d8d8" stroke-width="1.6"/>`;
+  }
+
+  function mouthSVG(kind){
+    if(kind==='none') return '';
+    if(kind==='flat') return `<line x1="45" y1="78" x2="55" y2="78" stroke="#8a5a45" stroke-width="1.6" stroke-linecap="round"/>`;
+    if(kind==='fangSmile') return `<path d="M43,76 Q50,84 57,76" fill="none" stroke="#8a5a45" stroke-width="1.6" stroke-linecap="round"/><path d="M46,78 L48,82 L50,78Z" fill="#fff"/>`;
+    return `<path d="M43,76 Q50,82 57,76" fill="none" stroke="#8a5a45" stroke-width="1.6" stroke-linecap="round"/>`;
+  }
+
+  function maskSVG(color){
+    return `<path d="M20,68 Q50,96 80,68 L80,60 Q50,84 20,60 Z" fill="${color}"/>`;
+  }
+
+  function faceSVG(cfg){
+    if(!cfg) return '';
+    const parts = [];
+    if(cfg.kingGlow){
+      parts.push(`<circle cx="50" cy="55" r="48" fill="${cfg.kingGlow}" opacity="0.4"/>`);
+      parts.push(`<circle cx="50" cy="55" r="40" fill="${cfg.kingGlow}" opacity="0.3"/>`);
+    }
+    parts.push(`<circle cx="50" cy="55" r="33" fill="${cfg.skin||SKIN}"/>`);
+    parts.push(earsSVG(cfg.skin||SKIN));
+    parts.push(hairSVG(cfg));
+    if(cfg.special==='zetsu'){
+      parts.push(`<path d="M50,22 Q30,10 18,30 Q26,40 50,55 Z" fill="${cfg.skin||SKIN}"/>`);
+      parts.push(`<path d="M50,22 Q70,10 82,30 Q74,40 50,55 Z" fill="#2a2a2a"/>`);
+    }
+    if(cfg.tiltedBand) parts.push(tiltedBandSVG());
+    else if(cfg.band) parts.push(bandSVG(cfg.band));
+    parts.push(eyesSVG(cfg));
+    if(cfg.glasses) parts.push(glassesSVG());
+    if(cfg.marks) cfg.marks.forEach(m=>parts.push(marksSVG(m)));
+    if(cfg.mask) parts.push(maskSVG(cfg.mask));
+    else parts.push(mouthSVG(cfg.mouth||'smile'));
+    return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">${parts.join('')}</svg>`;
+  }
+
+  const AKAMARU_FACE = {skin:'#f0e0c8', hair:'#e8dcc0', hairStyle:'long', eye:'#5a3a1a', eyeStyle:'dot', band:'none', mouth:'fangSmile'};
+
+  let board, currentTeam, selected, forcedCaptureChain, gameOver;
+  let mode = null; // 'friend' | 'ai'
+  let abilityMode = false;
+  let trap = null; // { r, c, remaining } — Tenten's arsenal trap, blocks Akatsuki
+  let HUMAN_TEAM = KONOHA, AI_TEAM = AKATSUKI;
+  const boardEl = document.getElementById('board');
+  const statusEl = document.getElementById('status');
+  const aiThinkingEl = document.getElementById('ai-thinking');
+  const scoreKonohaEl = document.getElementById('score-konoha');
+  const scoreAkatsukiEl = document.getElementById('score-akatsuki');
+  const winnerBanner = document.getElementById('winner-banner');
+  const highlightsEl = document.getElementById('match-highlights');
+  const timerEl = document.getElementById('match-timer');
+
+  const MATCH_DURATION_S = 6*60;
+  let matchSecondsLeft = MATCH_DURATION_S;
+  let matchTimerInterval = null;
+
+  function stopMatchTimer(){
+    if(matchTimerInterval){ clearInterval(matchTimerInterval); matchTimerInterval = null; }
+  }
+
+  function updateTimerDisplay(){
+    const m = Math.floor(matchSecondsLeft/60);
+    const s = matchSecondsLeft%60;
+    timerEl.textContent = '⏱ ' + m + ':' + String(s).padStart(2,'0');
+    timerEl.classList.toggle('low', matchSecondsLeft<=30);
+  }
+
+  function startMatchTimer(){
+    stopMatchTimer();
+    matchSecondsLeft = MATCH_DURATION_S;
+    updateTimerDisplay();
+    matchTimerInterval = setInterval(() => {
+      matchSecondsLeft--;
+      updateTimerDisplay();
+      if(matchSecondsLeft<=0){
+        stopMatchTimer();
+        declareDraw();
+      }
+    }, 1000);
+  }
+
+  function declareDraw(){
+    if(gameOver) return;
+    gameOver = true;
+    aiThinkingEl.classList.remove('active');
+    winnerBanner.style.display = 'block';
+    winnerBanner.textContent = '⏱ Tempo esgotado — Empate!';
+    statusEl.textContent = 'Partida encerrada';
+    renderHighlights();
+  }
+  const menuOverlay = document.getElementById('menu-overlay');
+  const villageOverlay = document.getElementById('village-overlay');
+  const villageCardsEl = document.getElementById('village-cards');
+  const placementOverlay = document.getElementById('placement-overlay');
+  const placementTitleEl = document.getElementById('placement-title');
+  const placementBoardEl = document.getElementById('placement-board');
+  const placementTrayEl = document.getElementById('placement-tray');
+  const placementConfirmBtn = document.getElementById('placement-confirm');
+  const layoutEl = document.querySelector('.layout');
+  const abilityBtn = document.getElementById('ability-btn');
+
+  abilityBtn.addEventListener('click', () => {
+    abilityMode = !abilityMode;
+    render();
+  });
+
+  // Music: file picker instead of a fixed filename — avoids "file not found" from path/naming mismatches.
+  const musicBtn = document.getElementById('music-btn');
+  const musicSwapBtn = document.getElementById('music-swap');
+  const musicFileInput = document.getElementById('music-file-input');
+  const bgm = document.getElementById('bgm');
+  bgm.volume = 0.5;
+  let musicLoaded = false;
+  let musicObjectUrl = null;
+
+  function loadMusicFile(file){
+    if(!file) return;
+    if(musicObjectUrl) URL.revokeObjectURL(musicObjectUrl);
+    musicObjectUrl = URL.createObjectURL(file);
+    bgm.src = musicObjectUrl;
+    bgm.play().then(() => {
+      musicLoaded = true;
+      musicBtn.textContent = '🔊 Pausar Música';
+      musicBtn.classList.add('playing');
+      musicBtn.classList.remove('missing');
+      musicSwapBtn.style.display = 'block';
+    }).catch(() => {
+      musicBtn.textContent = '⚠️ Não foi possível tocar esse arquivo';
+      musicBtn.classList.add('missing');
+    });
+  }
+
+  musicBtn.addEventListener('click', () => {
+    if(!musicLoaded){
+      musicFileInput.click();
+      return;
+    }
+    if(bgm.paused){
+      bgm.play();
+      musicBtn.textContent = '🔊 Pausar Música';
+      musicBtn.classList.add('playing');
+    } else {
+      bgm.pause();
+      musicBtn.textContent = '▶️ Tocar Música';
+      musicBtn.classList.remove('playing');
+    }
+  });
+  musicSwapBtn.addEventListener('click', () => musicFileInput.click());
+  musicFileInput.addEventListener('change', () => loadMusicFile(musicFileInput.files[0]));
+
+  const VILLAGES = [
+    {team: KONOHA, icon:'🍃', title:'Konoha', desc:'Vila da Folha — ninjas de Naruto e seus aliados.', playable:true},
+    {team: AKATSUKI, icon:'☁️', title:'Akatsuki', desc:'Organização criminosa de missing-nin renomados.', playable:true},
+    {team: null, icon:'🏜️', title:'Suna', desc:'Vila da Areia.', playable:false},
+    {team: null, icon:'💧', title:'Kiri', desc:'Vila da Névoa.', playable:false},
+    {team: null, icon:'⚡', title:'Kumo', desc:'Vila da Nuvem.', playable:false},
+    {team: null, icon:'🪨', title:'Iwa', desc:'Vila da Pedra.', playable:false}
+  ];
+
+  // --- Placement phase: choose which character starts on which of the 12 fixed squares ---
+  function buildSquareList(rowStart){
+    const list = [];
+    for(let r=rowStart;r<rowStart+3;r++){
+      for(let c=0;c<COLS;c++){
+        if((r+c)%2===1) list.push({r,c});
+      }
+    }
+    return list;
+  }
+  const KONOHA_SQUARES = buildSquareList(0);
+  const AKATSUKI_SQUARES = buildSquareList(5);
+  const sqKey = (r,c) => r+','+c;
+
+  let placementQueue = [];
+  const placementResults = {};
+  let placementState = null; // { team, squares, roster, assigned:{sqKey:rosterIdx}, selectedIdx }
+
+  function beginPlacementFlow(queue){
+    placementQueue = queue.slice();
+    placementResults[KONOHA] = null;
+    placementResults[AKATSUKI] = null;
+    nextPlacementStep();
+  }
+
+  function nextPlacementStep(){
+    if(placementQueue.length===0){ launchGame(); return; }
+    startPlacementFor(placementQueue.shift());
+  }
+
+  function startPlacementFor(team){
+    const squares = team===KONOHA ? KONOHA_SQUARES : AKATSUKI_SQUARES;
+    const roster = team===KONOHA ? konohaRoster : akatsukiRoster;
+    placementState = { team, squares, roster, assigned:{}, selectedIdx:null };
+    placementTitleEl.textContent = 'Posicione o time ' + (team===KONOHA ? 'Konoha 🍃' : 'Akatsuki ☁️');
+    renderPlacement();
+    menuOverlay.classList.add('hidden');
+    villageOverlay.classList.add('hidden');
+    placementOverlay.classList.remove('hidden');
+  }
+
+  function renderPlacement(){
+    const st = placementState;
+    placementBoardEl.innerHTML = '';
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        const sq = document.createElement('div');
+        sq.className = 'sq ' + (((r+c)%2===0) ? 'light' : 'dark');
+        const isSlot = st.squares.some(s => s.r===r && s.c===c);
+        if(isSlot){
+          const key = sqKey(r,c);
+          const rosterIdx = st.assigned[key];
+          sq.classList.add('placement-slot');
+          if(rosterIdx===undefined){
+            sq.classList.add('placement-empty');
+          } else {
+            const info = st.roster[rosterIdx];
+            const pieceEl = document.createElement('div');
+            pieceEl.className = 'piece ' + st.team;
+            pieceEl.innerHTML = `<span class="face">${faceSVG(info.face)}</span><span class="name">${info.name}</span>`;
+            sq.appendChild(pieceEl);
+          }
+          sq.addEventListener('click', () => onPlacementSquareClick(r,c));
+        } else {
+          sq.classList.add('placement-disabled');
+        }
+        placementBoardEl.appendChild(sq);
+      }
+    }
+    placementTrayEl.innerHTML = '';
+    const placedIdxs = new Set(Object.values(st.assigned));
+    st.roster.forEach((info, idx) => {
+      if(placedIdxs.has(idx)) return;
+      const card = document.createElement('div');
+      card.className = 'tray-card' + (st.selectedIdx===idx ? ' selected' : '');
+      card.innerHTML = `<div class="face">${faceSVG(info.face)}</div>${info.name}`;
+      card.addEventListener('click', () => {
+        st.selectedIdx = (st.selectedIdx===idx) ? null : idx;
+        renderPlacement();
+      });
+      placementTrayEl.appendChild(card);
+    });
+    placementConfirmBtn.disabled = placedIdxs.size < st.roster.length;
+  }
+
+  function onPlacementSquareClick(r,c){
+    const st = placementState;
+    const key = sqKey(r,c);
+    if(st.assigned[key] !== undefined){
+      delete st.assigned[key];
+      renderPlacement();
+      return;
+    }
+    if(st.selectedIdx!==null){
+      st.assigned[key] = st.selectedIdx;
+      st.selectedIdx = null;
+      renderPlacement();
+    }
+  }
+
+  document.getElementById('placement-random').addEventListener('click', () => {
+    const st = placementState;
+    const placedIdxs = new Set(Object.values(st.assigned));
+    const remainingIdxs = st.roster.map((_,i)=>i).filter(i => !placedIdxs.has(i));
+    const emptySquares = st.squares.filter(s => st.assigned[sqKey(s.r,s.c)]===undefined);
+    for(let i=remainingIdxs.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [remainingIdxs[i],remainingIdxs[j]] = [remainingIdxs[j],remainingIdxs[i]];
+    }
+    remainingIdxs.forEach((idx,i) => { st.assigned[sqKey(emptySquares[i].r,emptySquares[i].c)] = idx; });
+    st.selectedIdx = null;
+    renderPlacement();
+  });
+
+  document.getElementById('placement-default').addEventListener('click', () => {
+    const st = placementState;
+    st.assigned = {};
+    st.squares.forEach((s,i) => { st.assigned[sqKey(s.r,s.c)] = i; });
+    st.selectedIdx = null;
+    renderPlacement();
+  });
+
+  document.getElementById('placement-confirm').addEventListener('click', () => {
+    const st = placementState;
+    placementResults[st.team] = st.squares.map(s => st.roster[st.assigned[sqKey(s.r,s.c)]]);
+    nextPlacementStep();
+  });
+
+  function showVillageSelect(){
+    villageCardsEl.innerHTML = '';
+    VILLAGES.forEach(v => {
+      const card = document.createElement('div');
+      card.className = 'mode-card' + (v.playable ? '' : ' disabled');
+      card.innerHTML = `<div class="icon">${v.icon}</div><div class="title">${v.title}</div><div class="desc">${v.desc}</div>` +
+        (v.playable ? '' : '<div class="soon-badge">Em breve</div>');
+      if(v.playable){
+        card.addEventListener('click', () => {
+          mode = 'ai';
+          HUMAN_TEAM = v.team;
+          AI_TEAM = HUMAN_TEAM===KONOHA ? AKATSUKI : KONOHA;
+          villageOverlay.classList.add('hidden');
+          beginPlacementFlow([HUMAN_TEAM]);
+        });
+      }
+      villageCardsEl.appendChild(card);
+    });
+    menuOverlay.classList.add('hidden');
+    villageOverlay.classList.remove('hidden');
+  }
+
+  function launchGame(){
+    menuOverlay.classList.add('hidden');
+    villageOverlay.classList.add('hidden');
+    placementOverlay.classList.add('hidden');
+    layoutEl.classList.add('active');
+    initBoard(placementResults[KONOHA], placementResults[AKATSUKI]);
+  }
+
+  function backToMenu(){
+    menuOverlay.classList.remove('hidden');
+    villageOverlay.classList.add('hidden');
+    placementOverlay.classList.add('hidden');
+    layoutEl.classList.remove('active');
+    aiThinkingEl.classList.remove('active');
+    abilityMode = false;
+    trap = null;
+    stopMatchTimer();
+  }
+
+  document.getElementById('mode-friend').addEventListener('click', () => {
+    mode = 'friend';
+    menuOverlay.classList.add('hidden');
+    beginPlacementFlow([KONOHA, AKATSUKI]);
+  });
+  document.getElementById('mode-ai').addEventListener('click', showVillageSelect);
+  document.getElementById('village-back').addEventListener('click', () => {
+    villageOverlay.classList.add('hidden');
+    menuOverlay.classList.remove('hidden');
+  });
+  document.getElementById('back-to-menu').addEventListener('click', backToMenu);
+  document.getElementById('placement-cancel').addEventListener('click', backToMenu);
+
+  let lastKonohaOrder = null, lastAkatsukiOrder = null;
+
+  let allPieces = []; // every piece created this game, including later-captured ones — used for end-of-match stats
+  let activeClones = []; // { piece, turnsLeft } — Naruto's Kage Bunshin clones
+  let banishedPieces = []; // { piece, team, turnsLeft } — pieces sent to Obito's Kamui dimension
+
+  function freshStats(){ return { kills:0, squaresMoved:0, escapes:0 }; }
+
+  function initBoard(konohaOrder, akatsukiOrder){
+    lastKonohaOrder = konohaOrder = konohaOrder || lastKonohaOrder || konohaRoster;
+    lastAkatsukiOrder = akatsukiOrder = akatsukiOrder || lastAkatsukiOrder || akatsukiRoster;
+    board = Array.from({length:ROWS}, () => Array(COLS).fill(null));
+    allPieces = [];
+    activeClones = [];
+    banishedPieces = [];
+    let kIdx = 0, aIdx = 0;
+    for(let r=0;r<3;r++){
+      for(let c=0;c<COLS;c++){
+        if((r+c)%2===1){
+          const info = konohaOrder[kIdx++];
+          const p = { team: KONOHA, king:false, abilityUsed:false, stats:freshStats(), startR:r, startC:c, ...info };
+          board[r][c] = p;
+          allPieces.push(p);
+        }
+      }
+    }
+    for(let r=5;r<8;r++){
+      for(let c=0;c<COLS;c++){
+        if((r+c)%2===1){
+          const info = akatsukiOrder[aIdx++];
+          const p = { team: AKATSUKI, king:false, abilityUsed:false, stats:freshStats(), startR:r, startC:c, ...info };
+          board[r][c] = p;
+          allPieces.push(p);
+        }
+      }
+    }
+    currentTeam = KONOHA;
+    selected = null;
+    forcedCaptureChain = null;
+    abilityMode = false;
+    trap = null;
+    gameOver = false;
+    winnerBanner.style.display = 'none';
+    highlightsEl.classList.remove('active');
+    startMatchTimer();
+    render();
+    maybeAiMove();
+  }
+
+  function inBounds(r,c){ return r>=0 && r<ROWS && c>=0 && c<COLS; }
+
+  // Tenten's arsenal trap blocks movement/landing for Akatsuki only.
+  function isTrapBlocked(r,c,team){
+    return !!trap && trap.r===r && trap.c===c && team===AKATSUKI;
+  }
+
+  // Promoting to Dama also refreshes any ability the piece has (one more use), per the new house rule.
+  function promoteToKing(piece){
+    if(piece.king || piece.neverKing) return;
+    piece.king = true;
+    piece.abilityUsed = false;
+    if(piece.name==='Tenten') piece.trapUsed = false;
+  }
+
+  // Call whenever a piece lands on a square — handles promotion, or vanishing for clones/Akamaru that can't be kinged.
+  function handleRowArrival(piece, r, c){
+    const reached = (piece.team===KONOHA && r===ROWS-1) || (piece.team===AKATSUKI && r===0);
+    if(!reached) return;
+    if(piece.neverKing){
+      board[r][c] = null;
+    } else if(!piece.king){
+      promoteToKing(piece);
+    }
+  }
+
+  function endTurn(){
+    const leavingTeam = currentTeam;
+    currentTeam = currentTeam===KONOHA ? AKATSUKI : KONOHA;
+    if(trap && leavingTeam===AKATSUKI){
+      trap.remaining -= 1;
+      if(trap.remaining<=0) trap = null;
+    }
+
+    // Naruto's Kage Bunshin: clones dissolve after 6 total turns (either side).
+    for(let i=activeClones.length-1;i>=0;i--){
+      const entry = activeClones[i];
+      entry.turnsLeft--;
+      if(entry.turnsLeft<=0){
+        for(let r=0;r<ROWS;r++){
+          for(let c=0;c<COLS;c++){
+            if(board[r][c]===entry.piece) board[r][c] = null;
+          }
+        }
+        activeClones.splice(i,1);
+      }
+    }
+
+    // Obito's Kamui: banished pieces come back after missing 2 of their own team's turns.
+    for(let i=banishedPieces.length-1;i>=0;i--){
+      const entry = banishedPieces[i];
+      if(entry.team!==leavingTeam) continue;
+      entry.turnsLeft--;
+      if(entry.turnsLeft<=0){
+        restoreBanishedPiece(entry.piece);
+        banishedPieces.splice(i,1);
+      }
+    }
+  }
+
+  function restoreBanishedPiece(piece){
+    let target = null;
+    if(!board[piece.startR][piece.startC]){
+      target = {r:piece.startR, c:piece.startC};
+    } else {
+      target = findNearestEmptySquare(piece.startR, piece.startC, board);
+    }
+    if(target) board[target.r][target.c] = piece;
+  }
+
+  // --- Ability presentation: original synthesized sounds (no copyrighted audio) + a highlight-and-hold beat ---
+  let audioCtx = null;
+  function getAudioCtx(){
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function tone(ctx, now, type, f0, f1, start, dur, peak){
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(f0, now+start);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(f1,1), now+start+dur);
+    gain.gain.setValueAtTime(0.0001, now+start);
+    gain.gain.exponentialRampToValueAtTime(peak, now+start+dur*0.25);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now+start+dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now+start);
+    osc.stop(now+start+dur+0.02);
+  }
+
+  function noiseBurst(ctx, now, start, dur, peak, filterType, freq0, freq1){
+    const bufSize = Math.floor(ctx.sampleRate * dur);
+    const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<bufSize;i++) data[i] = Math.random()*2-1;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const filt = ctx.createBiquadFilter();
+    filt.type = filterType || 'lowpass';
+    filt.frequency.setValueAtTime(freq0, now+start);
+    if(freq1!==undefined) filt.frequency.exponentialRampToValueAtTime(Math.max(freq1,1), now+start+dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now+start);
+    gain.gain.exponentialRampToValueAtTime(peak, now+start+dur*0.15);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now+start+dur);
+    src.connect(filt).connect(gain).connect(ctx.destination);
+    src.start(now+start);
+    src.stop(now+start+dur+0.02);
+  }
+
+  // Generic fallback chime — used only if no character-specific sound applies.
+  function playSoundGeneric(){
+    try{
+      const ctx = getAudioCtx(), now = ctx.currentTime;
+      tone(ctx, now, 'sine', 220, 660, 0, 0.4, 0.22);
+      tone(ctx, now, 'triangle', 440, 1320, 0.08, 0.4, 0.14);
+      tone(ctx, now, 'sine', 880, 1760, 0.22, 0.3, 0.1);
+    }catch(e){}
+  }
+
+  // Pain — Bansho Ten'in: a gravity pull, pitch dives down then snaps with a low thud.
+  function playSoundPain(){
+    try{
+      const ctx = getAudioCtx(), now = ctx.currentTime;
+      tone(ctx, now, 'sawtooth', 700, 120, 0, 0.45, 0.18);
+      tone(ctx, now, 'sine', 90, 60, 0.42, 0.25, 0.3);
+    }catch(e){}
+  }
+
+  // Kiba — Jūjin Bunshin: a bright, cheerful summon "pop" with a little bark-like chirp.
+  function playSoundKiba(){
+    try{
+      const ctx = getAudioCtx(), now = ctx.currentTime;
+      tone(ctx, now, 'triangle', 300, 900, 0, 0.18, 0.22);
+      tone(ctx, now, 'square', 500, 1400, 0.12, 0.14, 0.15);
+      tone(ctx, now, 'triangle', 700, 380, 0.28, 0.16, 0.16);
+    }catch(e){}
+  }
+
+  // Chōji — Nikudan Sensha: a rolling rumble that ends in a heavy impact thud.
+  function playSoundChoji(){
+    try{
+      const ctx = getAudioCtx(), now = ctx.currentTime;
+      noiseBurst(ctx, now, 0, 0.9, 0.35, 'lowpass', 300, 700);
+      tone(ctx, now, 'sine', 140, 50, 0.85, 0.3, 0.35);
+    }catch(e){}
+  }
+
+  // Tenten — Sōshōryū: metallic weapon clangs.
+  function playSoundTenten(){
+    try{
+      const ctx = getAudioCtx(), now = ctx.currentTime;
+      tone(ctx, now, 'square', 1600, 900, 0, 0.12, 0.14);
+      tone(ctx, now, 'square', 2000, 1100, 0.1, 0.12, 0.13);
+      tone(ctx, now, 'square', 1800, 700, 0.2, 0.16, 0.12);
+    }catch(e){}
+  }
+
+  // Deidara — C0 (Katsu!): an explosion — sub-bass boom + filtered noise blast.
+  function playSoundDeidara(){
+    try{
+      const ctx = getAudioCtx(), now = ctx.currentTime;
+      tone(ctx, now, 'sine', 160, 40, 0, 0.35, 0.4);
+      noiseBurst(ctx, now, 0, 0.6, 0.5, 'lowpass', 2200, 200);
+    }catch(e){}
+  }
+
+  // Itachi — Kawarimi: fluttering crow wings — quick high chirps + a whoosh.
+  function playSoundItachi(){
+    try{
+      const ctx = getAudioCtx(), now = ctx.currentTime;
+      noiseBurst(ctx, now, 0, 0.35, 0.18, 'bandpass', 1800, 900);
+      tone(ctx, now, 'triangle', 900, 1400, 0.05, 0.09, 0.1);
+      tone(ctx, now, 'triangle', 1000, 1500, 0.16, 0.09, 0.09);
+      tone(ctx, now, 'triangle', 1100, 1600, 0.27, 0.09, 0.08);
+    }catch(e){}
+  }
+
+  // Naruto — Kage Bunshin no Jutsu: two bright "poof" pops, one per clone.
+  function playSoundNaruto(){
+    try{
+      const ctx = getAudioCtx(), now = ctx.currentTime;
+      noiseBurst(ctx, now, 0, 0.12, 0.3, 'bandpass', 900, 1400);
+      tone(ctx, now, 'triangle', 500, 950, 0, 0.14, 0.2);
+      noiseBurst(ctx, now, 0.18, 0.12, 0.3, 'bandpass', 900, 1400);
+      tone(ctx, now, 'triangle', 500, 950, 0.18, 0.14, 0.2);
+    }catch(e){}
+  }
+
+  // Obito — Kamui: a warping vortex sucking inward, pitch spiraling down.
+  function playSoundObito(){
+    try{
+      const ctx = getAudioCtx(), now = ctx.currentTime;
+      tone(ctx, now, 'sawtooth', 1200, 80, 0, 0.6, 0.16);
+      noiseBurst(ctx, now, 0, 0.6, 0.28, 'bandpass', 2500, 300);
+    }catch(e){}
+  }
+
+  const ABILITY_FX_MS = 2000;
+  function playAbilityFX(cells, boardElToUse, soundFn, callback){
+    (soundFn || playSoundGeneric)();
+    const els = cells.map(({r,c}) => boardElToUse.querySelector(`.sq[data-r="${r}"][data-c="${c}"]`)).filter(Boolean);
+    els.forEach(el => el.classList.add('ability-fx'));
+    setTimeout(() => {
+      els.forEach(el => el.classList.remove('ability-fx'));
+      callback();
+    }, ABILITY_FX_MS);
+  }
+
+  function dirsFor(piece){
+    if(piece.king) return [[-1,-1],[-1,1],[1,-1],[1,1]];
+    return piece.team === KONOHA ? [[1,-1],[1,1]] : [[-1,-1],[-1,1]];
+  }
+
+  function cloneBoard(b){
+    return b.map(row => row.map(cell => cell ? {...cell} : null));
+  }
+
+  // Pain's "Bansho Ten'in": pull an enemy exactly 2 diagonal squares away 1 square closer to himself.
+  // Targets returned are the ENEMY piece's square (what the player clicks); landR/landC is where it lands.
+  function approachTargets(r,c,b){
+    b = b || board;
+    const piece = b[r][c];
+    if(!piece || piece.ability!=='approach' || piece.abilityUsed) return [];
+    const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+    const targets = [];
+    for(const [dr,dc] of dirs){
+      const mr=r+dr, mc=c+dc, er=r+2*dr, ec=c+2*dc;
+      if(inBounds(er,ec) && b[er][ec] && b[er][ec].team!==piece.team && inBounds(mr,mc) && !b[mr][mc]){
+        targets.push({r:er, c:ec, landR:mr, landC:mc});
+      }
+    }
+    return targets;
+  }
+
+  // Kiba's "Jūjin Bunshin — Akamaru": create an ally on an empty diagonal-adjacent square.
+  function summonTargets(r,c,b){
+    b = b || board;
+    const piece = b[r][c];
+    if(!piece || piece.ability!=='summon' || piece.abilityUsed) return [];
+    const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+    const targets = [];
+    for(const [dr,dc] of dirs){
+      const rr=r+dr, cc=c+dc;
+      if(inBounds(rr,cc) && !b[rr][cc]) targets.push({r:rr,c:cc});
+    }
+    return targets;
+  }
+
+  // Naruto's "Kage Bunshin no Jutsu": same empty diagonal-adjacent squares as Kiba's summon — clicking one spawns up to 2 clones.
+  function kageBunshinTargets(r,c,b){
+    b = b || board;
+    const piece = b[r][c];
+    if(!piece || piece.ability!=='kage_bunshin' || piece.abilityUsed) return [];
+    const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+    const targets = [];
+    for(const [dr,dc] of dirs){
+      const rr=r+dr, cc=c+dc;
+      if(inBounds(rr,cc) && !b[rr][cc]) targets.push({r:rr,c:cc});
+    }
+    return targets;
+  }
+
+  // Obito's "Kamui": targets an adjacent ENEMY piece to banish (no landing square needed).
+  function kamuiTargets(r,c,b){
+    b = b || board;
+    const piece = b[r][c];
+    if(!piece || piece.ability!=='kamui' || piece.abilityUsed) return [];
+    const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+    const targets = [];
+    for(const [dr,dc] of dirs){
+      const rr=r+dr, cc=c+dc;
+      if(inBounds(rr,cc) && b[rr][cc] && b[rr][cc].team!==piece.team) targets.push({r:rr,c:cc});
+    }
+    return targets;
+  }
+
+  // Chōji's "Nikudan Sensha": rolls exactly 3 diagonal squares, phasing through anyone in the way.
+  // Whoever sits on the 3rd (landing) square is shoved to the 4th, or destroyed if that's impossible.
+  // Whoever sits on the 2nd square has nowhere to go (Chōji claims the 3rd) and is always destroyed.
+  // Whoever sits on the 1st square is shoved into the 2nd, which is guaranteed clear by then.
+  // At most 1 piece may be destroyed this way — a 2nd forced destruction cancels the whole move.
+  function computeBoulderPlan(r0,c0,dr,dc,b){
+    const s1={r:r0+dr,   c:c0+dc};
+    const s2={r:r0+2*dr, c:c0+2*dc};
+    const s3={r:r0+3*dr, c:c0+3*dc};
+    const s4={r:r0+4*dr, c:c0+4*dc};
+    if(!inBounds(s1.r,s1.c) || !inBounds(s2.r,s2.c) || !inBounds(s3.r,s3.c)) return null;
+
+    const moves = [];
+    const eliminations = [];
+
+    if(b[s3.r][s3.c]){
+      if(inBounds(s4.r,s4.c) && !b[s4.r][s4.c]){
+        moves.push({from:s3, to:s4});
+      } else {
+        eliminations.push(s3);
+      }
+    }
+    if(b[s2.r][s2.c]){
+      eliminations.push(s2);
+    }
+    if(b[s1.r][s1.c]){
+      moves.push({from:s1, to:s2});
+    }
+
+    if(eliminations.length > 1) return null; // segundo bloqueio: Chōji perde o movimento
+
+    return {s1, s2, s3, s4, moves, eliminations};
+  }
+
+  function boulderTargets(r,c,b){
+    b = b || board;
+    const piece = b[r][c];
+    if(!piece || piece.ability!=='boulder' || piece.abilityUsed) return [];
+    const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+    const targets = [];
+    for(const [dr,dc] of dirs){
+      const plan = computeBoulderPlan(r,c,dr,dc,b);
+      if(plan) targets.push({r:plan.s3.r, c:plan.s3.c, plan});
+    }
+    return targets;
+  }
+
+  // Nearest empty playable square to (r0,c0) — diagonal neighbors first, then expanding rings.
+  function findNearestEmptySquare(r0,c0,b){
+    const diagOrder = [[-1,-1],[-1,1],[1,-1],[1,1]];
+    for(const [dr,dc] of diagOrder){
+      const r=r0+dr, c=c0+dc;
+      if(inBounds(r,c) && !b[r][c]) return {r,c};
+    }
+    for(let dist=2; dist<=7; dist++){
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          if((r+c)%2===1 && Math.max(Math.abs(r-r0),Math.abs(c-c0))===dist && !b[r][c]){
+            return {r,c};
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // returns {simple:[{r,c}], captures:[{r,c,capturedR,capturedC}]}
+  function movesForPiece(r,c,b){
+    b = b || board;
+    const piece = b[r][c];
+    const simple = [];
+    const captures = [];
+    if(!piece) return {simple, captures};
+
+    if(piece.king){
+      // flying king: move up to KING_RANGE squares diagonally, capture over first enemy found with empty landing squares beyond (also capped)
+      const diagDirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+      for(const [dr,dc] of diagDirs){
+        let rr=r+dr, cc=c+dc, steps=1;
+        // simple moves along empty squares
+        while(steps<=KING_RANGE && inBounds(rr,cc) && !b[rr][cc] && !isTrapBlocked(rr,cc,piece.team)){
+          simple.push({r:rr,c:cc});
+          rr+=dr; cc+=dc; steps++;
+        }
+        // capture: find enemy (within range) then empty squares after (still within range)
+        if(steps<=KING_RANGE && inBounds(rr,cc) && b[rr][cc] && b[rr][cc].team !== piece.team){
+          const capR=rr, capC=cc;
+          let lr=rr+dr, lc=cc+dc; steps++;
+          while(steps<=KING_RANGE && inBounds(lr,lc) && !b[lr][lc] && !isTrapBlocked(lr,lc,piece.team)){
+            captures.push({r:lr,c:lc,capturedR:capR,capturedC:capC});
+            lr+=dr; lc+=dc; steps++;
+          }
+        }
+      }
+    } else {
+      const moveDirs = dirsFor(piece);
+      for(const [dr,dc] of moveDirs){
+        const rr=r+dr, cc=c+dc;
+        if(inBounds(rr,cc) && !b[rr][cc] && !isTrapBlocked(rr,cc,piece.team)){
+          simple.push({r:rr,c:cc});
+        }
+      }
+      // captures allowed in all 4 diagonal directions even for non-king (standard rule)
+      const allDirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+      for(const [dr,dc] of allDirs){
+        const mr=r+dr, mc=c+dc;
+        const lr=r+2*dr, lc=c+2*dc;
+        if(inBounds(lr,lc) && b[mr] && b[mr][mc] && b[mr][mc].team!==piece.team && !b[lr][lc] && !isTrapBlocked(lr,lc,piece.team)){
+          captures.push({r:lr,c:lc,capturedR:mr,capturedC:mc});
+        }
+      }
+    }
+    return {simple, captures};
+  }
+
+  function allCapturesForTeam(team,b){
+    b = b || board;
+    const list = [];
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        const p = b[r][c];
+        if(p && p.team===team){
+          const {captures} = movesForPiece(r,c,b);
+          if(captures.length) list.push({r,c,captures});
+        }
+      }
+    }
+    return list;
+  }
+
+  function anyMovesForTeam(team,b){
+    b = b || board;
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        const p = b[r][c];
+        if(p && p.team===team){
+          const {simple, captures} = movesForPiece(r,c,b);
+          if(simple.length || captures.length) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function render(){
+    boardEl.innerHTML = '';
+    const mandatory = allCapturesForTeam(currentTeam);
+    const mandatorySet = new Set(mandatory.map(m => m.r+','+m.c));
+
+    const selPiece = selected ? board[selected.r][selected.c] : null;
+    const abilityEligible = !gameOver && selPiece && selPiece.ability && !selPiece.abilityUsed &&
+      !forcedCaptureChain && mandatory.length===0 && !(mode==='ai' && currentTeam===AI_TEAM);
+
+    if(!abilityEligible) abilityMode = false;
+
+    if(abilityEligible){
+      abilityBtn.style.display = 'block';
+      abilityBtn.classList.toggle('active', abilityMode);
+      const abilityLabels = {
+        approach: '✨ Usar Habilidade: Bansho Ten\'in (Pain)',
+        summon: '✨ Usar Habilidade: Jūjin Bunshin — Akamaru (Kiba)',
+        boulder: '✨ Usar Habilidade: Nikudan Sensha (Chōji)',
+        kage_bunshin: '✨ Usar Habilidade: Kage Bunshin no Jutsu (Naruto)',
+        kamui: '✨ Usar Habilidade: Kamui (Obito)'
+      };
+      abilityBtn.textContent = abilityMode ? '✖ Cancelar Habilidade' : abilityLabels[selPiece.ability];
+    } else {
+      abilityBtn.style.display = 'none';
+    }
+
+    let activeMoves = null;
+    let specialTargets = null;
+    if(selected){
+      if(abilityMode && selPiece){
+        const targetFns = { approach:approachTargets, summon:summonTargets, boulder:boulderTargets, kage_bunshin:kageBunshinTargets, kamui:kamuiTargets };
+        specialTargets = (targetFns[selPiece.ability] || (()=>[]))(selected.r, selected.c);
+      } else {
+        const {simple, captures} = movesForPiece(selected.r, selected.c);
+        if(forcedCaptureChain){
+          activeMoves = captures;
+        } else if(mandatory.length){
+          activeMoves = captures;
+        } else {
+          activeMoves = simple;
+        }
+      }
+    }
+
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        const sq = document.createElement('div');
+        sq.className = 'sq ' + (((r+c)%2===0) ? 'light' : 'dark');
+        sq.dataset.r = r; sq.dataset.c = c;
+
+        if(selected && selected.r===r && selected.c===c){
+          sq.classList.add('selected');
+        }
+        if(specialTargets){
+          const found = specialTargets.find(m => m.r===r && m.c===c);
+          if(found){
+            if(selPiece.ability==='approach'){
+              sq.classList.add('special-approach'); // target is an occupied enemy square — outline, no dot
+            } else if(selPiece.ability==='boulder'){
+              sq.classList.add('special-boulder'); // landing square may be occupied too — outline, no dot
+            } else if(selPiece.ability==='kamui'){
+              sq.classList.add('special-kamui'); // target is an occupied enemy square — outline, no dot
+            } else if(selPiece.ability==='kage_bunshin'){
+              sq.classList.add('selectable', 'special-clone');
+            } else {
+              sq.classList.add('selectable', 'special-summon');
+            }
+          }
+        } else if(activeMoves){
+          const found = activeMoves.find(m => m.r===r && m.c===c);
+          if(found){
+            sq.classList.add('selectable');
+            if(found.capturedR !== undefined) sq.classList.add('capture-target');
+          }
+        }
+        if(trap && trap.r===r && trap.c===c){
+          sq.classList.add('trapped');
+          sq.title = `Armadilha da Tenten — bloqueia o Akatsuki por mais ${trap.remaining} turno(s)`;
+        }
+
+        const piece = board[r][c];
+        if(piece){
+          const pieceEl = document.createElement('div');
+          pieceEl.className = 'piece ' + piece.team + (piece.king ? ' king' : '') + (piece.isClone ? ' clone-piece' : '');
+          const passiveHints = {
+            'Tenten': 'Sōshōryū — arma uma armadilha na 1ª captura',
+            'Deidara': 'C0 (Katsu!) — explode ao ser capturado',
+            'Itachi': 'Kawarimi: Bunshin de Corvos — escapa da 1ª captura'
+          };
+          const passiveDone = piece.name==='Tenten' ? piece.trapUsed : piece.abilityUsed;
+          const isKinged = piece.king && piece.kingForm;
+          const displayName = isKinged ? piece.kingForm.name : piece.name;
+          const displayFace = isKinged ? piece.kingForm.face : piece.face;
+          pieceEl.title = displayName + (isKinged ? ` (Dama — antes: ${piece.name})` : '')
+            + (piece.ability && !piece.abilityUsed ? ' — habilidade especial disponível' : '')
+            + (!piece.ability && passiveHints[piece.name] && !passiveDone ? ' — ' + passiveHints[piece.name] : '');
+          const canSelect = !gameOver && piece.team===currentTeam && (!forcedCaptureChain || (forcedCaptureChain.r===r && forcedCaptureChain.c===c)) && (mandatorySet.size===0 || mandatorySet.has(r+','+c) || (forcedCaptureChain && forcedCaptureChain.r===r && forcedCaptureChain.c===c));
+          if(canSelect){
+            pieceEl.style.cursor = 'pointer';
+          } else {
+            pieceEl.style.opacity = (piece.team===currentTeam && mandatorySet.size>0 && !mandatorySet.has(r+','+c)) ? '0.55' : '1';
+          }
+          pieceEl.innerHTML = `<span class="face">${faceSVG(displayFace)}</span><span class="name">${displayName}</span>` +
+            (piece.ability && !piece.abilityUsed ? `<span class="ability-badge">✨</span>` : '');
+          sq.appendChild(pieceEl);
+        }
+
+        sq.addEventListener('click', () => onSquareClick(r,c));
+        boardEl.appendChild(sq);
+      }
+    }
+
+    updateStatus();
+  }
+
+  function onSquareClick(r,c){
+    if(gameOver) return;
+    if(mode==='ai' && currentTeam===AI_TEAM) return; // IA está jogando
+    const piece = board[r][c];
+    const mandatory = allCapturesForTeam(currentTeam);
+    const mandatorySet = new Set(mandatory.map(m => m.r+','+m.c));
+
+    if(abilityMode && selected){
+      const selPiece = board[selected.r][selected.c];
+      if(selPiece){
+        if(selPiece.ability==='approach'){
+          const t = approachTargets(selected.r, selected.c).find(m => m.r===r && m.c===c);
+          if(t){ executeApproach(selected.r, selected.c, r, c); return; }
+        } else if(selPiece.ability==='summon'){
+          const t = summonTargets(selected.r, selected.c).find(m => m.r===r && m.c===c);
+          if(t){ executeSummon(selected.r, selected.c, r, c); return; }
+        } else if(selPiece.ability==='boulder'){
+          const t = boulderTargets(selected.r, selected.c).find(m => m.r===r && m.c===c);
+          if(t){ executeBoulder(selected.r, selected.c, r, c); return; }
+        } else if(selPiece.ability==='kage_bunshin'){
+          const t = kageBunshinTargets(selected.r, selected.c).find(m => m.r===r && m.c===c);
+          if(t){ executeKageBunshin(selected.r, selected.c, r, c); return; }
+        } else if(selPiece.ability==='kamui'){
+          const t = kamuiTargets(selected.r, selected.c).find(m => m.r===r && m.c===c);
+          if(t){ executeKamui(selected.r, selected.c, r, c); return; }
+        }
+      }
+      if(piece && piece.team===currentTeam){
+        abilityMode = false;
+        selected = {r,c};
+        render();
+      }
+      return;
+    }
+
+    // If mid forced-capture-chain, only the chaining piece can act
+    if(forcedCaptureChain){
+      if(piece && piece.team===currentTeam) return; // ignore other clicks
+      if(selected && selected.r===forcedCaptureChain.r && selected.c===forcedCaptureChain.c){
+        tryMove(selected.r, selected.c, r, c);
+      }
+      return;
+    }
+
+    if(piece && piece.team===currentTeam){
+      if(mandatorySet.size>0 && !mandatorySet.has(r+','+c)){
+        return; // must pick a piece that can capture
+      }
+      abilityMode = false;
+      selected = {r,c};
+      render();
+      return;
+    }
+
+    if(selected){
+      tryMove(selected.r, selected.c, r, c);
+    }
+  }
+
+  function tryMove(fr, fc, tr, tc){
+    const piece = board[fr][fc];
+    if(!piece) return;
+    const {simple, captures} = movesForPiece(fr, fc);
+    const mandatory = allCapturesForTeam(currentTeam);
+
+    let move = captures.find(m => m.r===tr && m.c===tc);
+    let isCapture = !!move;
+    if(!isCapture){
+      if(mandatory.length>0) return; // must capture
+      move = simple.find(m => m.r===tr && m.c===tc);
+      if(!move) return;
+    }
+
+    // Kawarimi Lendário tracker: everyone else who was also capturable this turn but wasn't chosen "escaped".
+    if(isCapture){
+      const chosenKey = move.capturedR+','+move.capturedC;
+      const seen = new Set();
+      mandatory.forEach(entry => {
+        entry.captures.forEach(cap => {
+          const key = cap.capturedR+','+cap.capturedC;
+          if(key===chosenKey || seen.has(key)) return;
+          seen.add(key);
+          const survivor = board[cap.capturedR][cap.capturedC];
+          if(survivor && survivor.stats) survivor.stats.escapes++;
+        });
+      });
+    }
+
+    piece.stats.squaresMoved += Math.abs(tr-fr);
+
+    // execute move
+    board[tr][tc] = piece;
+    board[fr][fc] = null;
+
+    if(isCapture){
+      const capturedPiece = board[move.capturedR][move.capturedC];
+      board[move.capturedR][move.capturedC] = null;
+      if(capturedPiece.isClone){
+        // Naruto's Kage Bunshin: capturing a clone never counts as an elimination for the opponent.
+        const cloneIdx = activeClones.findIndex(e => e.piece===capturedPiece);
+        if(cloneIdx>=0) activeClones.splice(cloneIdx,1);
+      } else {
+        piece.stats.kills++;
+      }
+
+      // Tenten — Sōshōryū: 1ª captura da partida arma uma armadilha na casa da vítima.
+      if(piece.name==='Tenten' && !piece.trapUsed){
+        piece.trapUsed = true;
+        trap = { r: move.capturedR, c: move.capturedC, remaining: 2 };
+        playSoundTenten();
+      }
+
+      // Itachi — Kawarimi: Bunshin de Corvos: escapa da 1ª captura reaparecendo na casa livre mais próxima.
+      if(capturedPiece && capturedPiece.name==='Itachi' && !capturedPiece.abilityUsed){
+        capturedPiece.abilityUsed = true;
+        capturedPiece.stats.escapes++;
+        const respawn = findNearestEmptySquare(move.capturedR, move.capturedC, board);
+        if(respawn){
+          board[respawn.r][respawn.c] = capturedPiece;
+        }
+        playSoundItachi();
+      }
+
+      // Deidara — C0 (Katsu!): quem o captura explode junto, interrompendo qualquer cadeia na hora.
+      if(capturedPiece && capturedPiece.name==='Deidara'){
+        playSoundDeidara();
+        capturedPiece.stats.kills++;
+        board[tr][tc] = null;
+        selected = null;
+        forcedCaptureChain = null;
+        abilityMode = false;
+        endTurn();
+        render();
+        checkGameOver();
+        maybeAiMove();
+        return;
+      }
+    }
+
+    // king promotion (or vanish, for clones/Akamaru)
+    handleRowArrival(piece, tr, tc);
+
+    if(isCapture){
+      const {captures: nextCaptures} = movesForPiece(tr, tc);
+      if(nextCaptures.length>0){
+        selected = {r:tr,c:tc};
+        forcedCaptureChain = {r:tr,c:tc};
+        render();
+        checkGameOver();
+        maybeAiMove();
+        return;
+      }
+    }
+
+    // end turn
+    selected = null;
+    forcedCaptureChain = null;
+    endTurn();
+    render();
+    checkGameOver();
+    maybeAiMove();
+  }
+
+  function maybeAiMove(){
+    if(gameOver || mode!=='ai' || currentTeam!==AI_TEAM) return;
+    aiThinkingEl.classList.add('active');
+    setTimeout(aiTakeTurn, 550 + Math.random()*350);
+  }
+
+  // Pain stays put; the enemy piece at (tr,tc) gets pulled 1 square toward him.
+  function executeApproach(fr, fc, tr, tc){
+    const pain = board[fr][fc];
+    if(!pain || pain.ability!=='approach' || pain.abilityUsed) return;
+    const target = approachTargets(fr, fc).find(m => m.r===tr && m.c===tc);
+    if(!target) return;
+    selected = null;
+    forcedCaptureChain = null;
+    abilityMode = false;
+    render();
+    playAbilityFX([{r:fr,c:fc},{r:tr,c:tc},{r:target.landR,c:target.landC}], boardEl, playSoundPain, () => {
+      const enemy = board[tr][tc];
+      board[target.landR][target.landC] = enemy;
+      board[tr][tc] = null;
+      pain.abilityUsed = true;
+      handleRowArrival(enemy, target.landR, target.landC);
+      endTurn();
+      render();
+      checkGameOver();
+      maybeAiMove();
+    });
+  }
+
+  function executeSummon(fr, fc, tr, tc){
+    const kiba = board[fr][fc];
+    if(!kiba || kiba.ability!=='summon' || kiba.abilityUsed || board[tr][tc]) return;
+    selected = null;
+    forcedCaptureChain = null;
+    abilityMode = false;
+    render();
+    playAbilityFX([{r:fr,c:fc},{r:tr,c:tc}], boardEl, playSoundKiba, () => {
+      kiba.abilityUsed = true;
+      const akamaru = { team: kiba.team, king:false, neverKing:true, abilityUsed:true, name:'Akamaru', face:AKAMARU_FACE, stats:freshStats(), startR:tr, startC:tc };
+      board[tr][tc] = akamaru;
+      allPieces.push(akamaru);
+      endTurn();
+      render();
+      checkGameOver();
+      maybeAiMove();
+    });
+  }
+
+  // Naruto — Kage Bunshin no Jutsu: clicking one empty diagonal spawns up to 2 short-lived clones.
+  function executeKageBunshin(fr, fc, tr, tc){
+    const naruto = board[fr][fc];
+    if(!naruto || naruto.ability!=='kage_bunshin' || naruto.abilityUsed) return;
+    const targets = kageBunshinTargets(fr, fc);
+    if(!targets.find(t => t.r===tr && t.c===tc)) return;
+    selected = null;
+    forcedCaptureChain = null;
+    abilityMode = false;
+    render();
+    const cells = [{r:fr,c:fc}, ...targets];
+    playAbilityFX(cells, boardEl, playSoundNaruto, () => {
+      naruto.abilityUsed = true;
+      const chosen = [{r:tr,c:tc}];
+      const other = targets.find(t => !(t.r===tr && t.c===tc) && !board[t.r][t.c]);
+      if(other) chosen.push(other);
+      chosen.forEach(t => {
+        const clone = { team:naruto.team, king:false, neverKing:true, abilityUsed:true, isClone:true,
+          name:'Clone de Sombra', face:naruto.face, stats:freshStats(), startR:t.r, startC:t.c };
+        board[t.r][t.c] = clone;
+        allPieces.push(clone);
+        activeClones.push({piece:clone, turnsLeft:6});
+      });
+      endTurn();
+      render();
+      checkGameOver();
+      maybeAiMove();
+    });
+  }
+
+  // Obito — Kamui: banishes an adjacent enemy for 2 of its team's turns.
+  function executeKamui(fr, fc, tr, tc){
+    const obito = board[fr][fc];
+    if(!obito || obito.ability!=='kamui' || obito.abilityUsed) return;
+    const target = kamuiTargets(fr, fc).find(t => t.r===tr && t.c===tc);
+    if(!target) return;
+    selected = null;
+    forcedCaptureChain = null;
+    abilityMode = false;
+    render();
+    playAbilityFX([{r:fr,c:fc},{r:tr,c:tc}], boardEl, playSoundObito, () => {
+      obito.abilityUsed = true;
+      const victim = board[tr][tc];
+      board[tr][tc] = null;
+      banishedPieces.push({piece:victim, team:victim.team, turnsLeft:2});
+      endTurn();
+      render();
+      checkGameOver();
+      maybeAiMove();
+    });
+  }
+
+  function executeBoulder(fr, fc, tr, tc){
+    const choji = board[fr][fc];
+    if(!choji || choji.ability!=='boulder' || choji.abilityUsed) return;
+    const target = boulderTargets(fr, fc).find(t => t.r===tr && t.c===tc);
+    if(!target) return;
+    const plan = target.plan;
+    selected = null;
+    forcedCaptureChain = null;
+    abilityMode = false;
+    render();
+    const cells = [{r:fr,c:fc}, plan.s1, plan.s2, plan.s3];
+    if(inBounds(plan.s4.r,plan.s4.c)) cells.push(plan.s4);
+    playAbilityFX(cells, boardEl, playSoundChoji, () => {
+      for(const e of plan.eliminations){
+        board[e.r][e.c] = null;
+      }
+      for(const mv of plan.moves){
+        const p = board[mv.from.r][mv.from.c];
+        board[mv.to.r][mv.to.c] = p;
+        board[mv.from.r][mv.from.c] = null;
+      }
+      board[plan.s3.r][plan.s3.c] = choji;
+      board[fr][fc] = null;
+      choji.abilityUsed = true;
+      choji.stats.squaresMoved += 3;
+      choji.stats.kills += plan.eliminations.length;
+      handleRowArrival(choji, plan.s3.r, plan.s3.c);
+      endTurn();
+      render();
+      checkGameOver();
+      maybeAiMove();
+    });
+  }
+
+  function aiTakeTurn(){
+    if(gameOver || mode!=='ai' || currentTeam!==AI_TEAM) return;
+    aiThinkingEl.classList.remove('active');
+
+    const mandatory = allCapturesForTeam(AI_TEAM);
+    let fr, fc, move;
+
+    if(mandatory.length>0){
+      let best = null, bestScore = -Infinity;
+      for(const entry of mandatory){
+        for(const cap of entry.captures){
+          const capturedPiece = board[cap.capturedR][cap.capturedC];
+          const clone = cloneBoard(board);
+          const movingPiece = clone[entry.r][entry.c];
+          clone[cap.r][cap.c] = movingPiece;
+          clone[entry.r][entry.c] = null;
+          clone[cap.capturedR][cap.capturedC] = null;
+          let promoted = false;
+          if(!movingPiece.king && cap.r===0){ movingPiece.king = true; promoted = true; }
+          const {captures: chainCaptures} = movesForPiece(cap.r, cap.c, clone);
+          let score = (capturedPiece.king ? 3 : 1) + chainCaptures.length*2 + (promoted?1.5:0) + Math.random()*0.5;
+          if(score > bestScore){
+            bestScore = score;
+            best = {r:entry.r, c:entry.c, to:cap};
+          }
+        }
+      }
+      fr = best.r; fc = best.c; move = best.to;
+    } else {
+      const candidates = [];
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          const p = board[r][c];
+          if(p && p.team===AI_TEAM){
+            const {simple} = movesForPiece(r,c);
+            for(const m of simple) candidates.push({r,c,to:m});
+            if(p.ability==='approach' && !p.abilityUsed){
+              for(const m of approachTargets(r,c)) candidates.push({r,c,to:m,special:'approach'});
+            }
+          }
+        }
+      }
+      if(candidates.length===0) return; // no moves, checkGameOver already handles loss
+      let best = null, bestScore = -Infinity;
+      for(const cand of candidates){
+        const clone = cloneBoard(board);
+        let score;
+        if(cand.special==='approach'){
+          // Pain doesn't move; the enemy at cand.to gets pulled to landR/landC.
+          const enemy = clone[cand.to.r][cand.to.c];
+          const landR = cand.to.landR, landC = cand.to.landC;
+          clone[landR][landC] = enemy;
+          clone[cand.to.r][cand.to.c] = null;
+          if(!enemy.king && !enemy.neverKing){
+            if((enemy.team===KONOHA && landR===ROWS-1) || (enemy.team===AKATSUKI && landR===0)) enemy.king = true;
+          }
+          const setsUpCapture = allCapturesForTeam(AI_TEAM, clone).length > 0;
+          score = (setsUpCapture ? 3 : 0.2) + Math.random()*1.2;
+        } else {
+          const movingPiece = clone[cand.r][cand.c];
+          clone[cand.to.r][cand.to.c] = movingPiece;
+          clone[cand.r][cand.c] = null;
+          let promotes = false;
+          if(!movingPiece.king && cand.to.r===0){ movingPiece.king = true; promotes = true; }
+          const opponentCaptures = allCapturesForTeam(HUMAN_TEAM, clone).some(entry =>
+            entry.captures.some(cp => cp.capturedR===cand.to.r && cp.capturedC===cand.to.c)
+          );
+          score = (promotes?4:0) - (opponentCaptures?3:0) + Math.random()*1.2;
+        }
+        if(score > bestScore){
+          bestScore = score;
+          best = cand;
+        }
+      }
+      fr = best.r; fc = best.c; move = best.to;
+      if(best.special==='approach'){
+        executeApproach(fr, fc, move.r, move.c);
+        return;
+      }
+    }
+
+    tryMove(fr, fc, move.r, move.c);
+  }
+
+  function countPieces(team){
+    let n=0;
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(board[r][c] && board[r][c].team===team) n++;
+    return n;
+  }
+
+  function updateStatus(){
+    const kCount = countPieces(KONOHA);
+    const aCount = countPieces(AKATSUKI);
+    scoreKonohaEl.textContent = kCount;
+    scoreAkatsukiEl.textContent = aCount;
+
+    statusEl.classList.remove('turn-konoha','turn-akatsuki');
+    if(!gameOver){
+      statusEl.classList.add(currentTeam===KONOHA ? 'turn-konoha' : 'turn-akatsuki');
+      if(mode==='ai'){
+        const teamLabel = currentTeam===KONOHA ? 'Konoha 🍃' : 'Akatsuki ☁️';
+        statusEl.textContent = (currentTeam===HUMAN_TEAM ? 'Sua vez (' : 'Vez da IA (') + teamLabel + ')';
+      } else {
+        statusEl.textContent = 'Vez de: ' + (currentTeam===KONOHA ? 'Konoha 🍃' : 'Akatsuki ☁️');
+      }
+    }
+    if(!(mode==='ai' && currentTeam===AI_TEAM && !gameOver)){
+      aiThinkingEl.classList.remove('active');
+    }
+  }
+
+  // "Pódio da Batalha" — end-of-match highlights, named after Naruto-universe concepts.
+  const HIGHLIGHT_CATEGORIES = [
+    { key:'kills', icon:'🩸', label:'Livro Bingo: Rank S', unit:n => n + (n===1?' eliminação':' eliminações') },
+    { key:'squaresMoved', icon:'⚡', label:'Hiraishin: Deus do Trovão', unit:n => n + (n===1?' casa percorrida':' casas percorridas') },
+    { key:'escapes', icon:'🌀', label:'Kawarimi Lendário', unit:n => n + (n===1?' fuga heroica':' fugas heroicas') }
+  ];
+
+  function computeHighlights(){
+    return HIGHLIGHT_CATEGORIES.map(cat => {
+      let top = null;
+      allPieces.forEach(p => {
+        if(!p.stats) return;
+        if(!top || p.stats[cat.key] > top.stats[cat.key]) top = p;
+      });
+      if(!top || top.stats[cat.key] <= 0) return null;
+      return { cat, piece: top, value: top.stats[cat.key] };
+    }).filter(Boolean);
+  }
+
+  function renderHighlights(){
+    const items = computeHighlights();
+    if(items.length===0){ highlightsEl.classList.remove('active'); return; }
+    highlightsEl.innerHTML = '<div class="highlights-title">🏆 Pódio da Batalha</div>' + items.map(item => {
+      const p = item.piece;
+      const isKinged = p.king && p.kingForm;
+      const displayName = isKinged ? p.kingForm.name : p.name;
+      const displayFace = isKinged ? p.kingForm.face : p.face;
+      return `<div class="trophy-card">
+        <div class="trophy-face ${p.team}">${faceSVG(displayFace)}</div>
+        <div class="trophy-info">
+          <div class="trophy-label">${item.cat.icon} ${item.cat.label}</div>
+          <div class="trophy-name">${displayName}</div>
+          <div class="trophy-stat">${item.cat.unit(item.value)}</div>
+        </div>
+      </div>`;
+    }).join('');
+    highlightsEl.classList.add('active');
+  }
+
+  function checkGameOver(){
+    const kCount = countPieces(KONOHA);
+    const aCount = countPieces(AKATSUKI);
+    let winner = null;
+    if(kCount===0) winner = 'Akatsuki';
+    else if(aCount===0) winner = 'Konoha';
+    else if(!anyMovesForTeam(currentTeam)) winner = currentTeam===KONOHA ? 'Akatsuki' : 'Konoha';
+
+    if(winner){
+      gameOver = true;
+      stopMatchTimer();
+      aiThinkingEl.classList.remove('active');
+      winnerBanner.style.display = 'block';
+      winnerBanner.textContent = '🏆 Vitória de ' + winner + '!';
+      statusEl.textContent = 'Partida encerrada';
+      renderHighlights();
+    }
+  }
+
+  document.getElementById('restart').addEventListener('click', () => { if(mode) initBoard(); });
+})();
+</script>
+</body>
+</html>
