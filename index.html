@@ -1356,7 +1356,7 @@
   // The server (server.js) never touches game rules — it only relays messages between the 2 sockets in
   // a room. Both clients run the exact same game logic locally; syncing "replay this click" between them
   // is what keeps the two boards identical, the same way 2 people sitting at the same table would.
-  const ONLINE_SERVER_URL = (location.protocol==='http:' || location.protocol==='https:') ? location.origin : 'http://localhost:3001';
+  const ONLINE_SERVER_URL = 'https://servidor-naruto-dama.onrender.com';
   let onlineSocket = null;
   let onlineRole = null; // 'host' | 'guest'
   let onlineTeam = null; // KONOHA (host) | AKATSUKI (guest) — which side THIS client plays
